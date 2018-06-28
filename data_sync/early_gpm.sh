@@ -1,21 +1,17 @@
-#####
-args    = commandArgs(trailingOnly=T)
-DOI     = as.Date(args[1])
-yyyymm  = format(DOI,'%Y%m')
-#####
+#!/bin/bash
 
-prot = 'ftp://'
-svr = 'jsimpson.pps.eosdis.nasa.gov'
-pth = '/NRTPUB/imerg/early/'
+DOI=$1
 
-OUTPUTDIR = paste0('/g/data/fj4/SatellitePrecip/GPM/global/early/',yyyymm)
-if (!dir.exists(OUTPUTDIR)) {
-        dir.create(OUTPUTDIR)
-}
+DATE=`date +%Y%m`
 
-setwd(OUTPUTDIR)
-commandText = paste0('/usr/bin/wget -nv -nd -N -o Download.log ',
-                     prot,'luigi.j.renzullo%40gmail.com:luigi.j.renzullo%40gmail.com',
-                     '@', svr, pth, yyyymm,'/3B*')
+FTP_PATH='ftp://jsimpson.pps.eosdis.nasa.gov/NRTPUB/imerg/early/'
+OUTDIR='/g/data/fj4/SatellitePrecip/GPM/global/early/'$DOI
 
-system(commandText)
+if [ -d "$OUTDIR" ]; then
+	echo $OUTDIR$DATE
+	# mkdir $OUTDIR
+fi
+
+if [ ! -d "$OUTDIR" ]; then
+	echo $OUTDIR$DATE
+fi
