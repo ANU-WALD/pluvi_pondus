@@ -15,15 +15,15 @@ def monthly_range(start_date, end_date):
 
 server = ECMWFDataServer()
 
-start_date = date(2015, 1, 1)
-end_date = date(2015, 7, 1)
+start_date = date(2018, 1, 1)
+end_date = date(2018, 4, 1)
 for (d0, d1) in monthly_range(start_date, end_date):
     server.retrieve({
         "type": "fc",
         "class": "ea",
         "dataset": "era5",
         #"date": "{0}/to/{1}".format(d0.strftime('%Y-%m-%d'), d1.strftime('%Y-%m-%d')),
-        "date": "2017-01-01/to/2017-02-01",
+        "date": "2018-01-01/to/2018-06-01",
         "expver": "1",
         "levtype": "sfc",
         "param": "228.128/260015",
