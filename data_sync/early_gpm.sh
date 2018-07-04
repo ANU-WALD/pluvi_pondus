@@ -18,11 +18,18 @@ DOWNLOAD_GPM_EARLY() {
 	done
 }
 
+if [ -z "$1" ]; then
+	# If no argument supplied the we update the collection"
 
-#YESTERDAY
-DATE=`date -d "yesterday 12:00" +%Y%m%d`
-DOWNLOAD_GPM_EARLY "$DATE"
+	#YESTERDAY
+	DATE=`date -d "yesterday 12:00" +%Y%m%d`
+	DOWNLOAD_GPM_EARLY "$DATE"
 
-#TODAY
-DATE=`date +%Y%m%d`
-DOWNLOAD_GPM_EARLY "$DATE"
+	#TODAY
+	DATE=`date +%Y%m%d`
+	DOWNLOAD_GPM_EARLY "$DATE"
+else
+	# Else we download the specified date YYYYMMDD"
+	DOWNLOAD_GPM_EARLY "$1"
+fi
+
