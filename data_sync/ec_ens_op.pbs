@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -a 0600
+#PBS -P fj4
+#PBS -q copyq
+#PBS -l walltime=06:00:00
+#PBS -l mem=16GB
+#PBS -l ncpus=1
+#PBS -l wd 
+  
+cd ~/github/pluvi_pondus/data_sync 
+./ecmwf_pfr.sh
+qsub ec_ens_op.pbs
