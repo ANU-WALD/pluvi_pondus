@@ -7,7 +7,7 @@ RUNS=("00" "12")
 DOWNLOAD_PFR() {
 
 	FTP_PATH='ftp://dissemination.ecmwf.int/DATA/PFR/'$1
-	OUTDIR='/g/data/xc0/user/pablo'
+	OUTDIR='/g/data/fj4/ECMWF/OP_ENS'
 
 	if [ ! -d "$OUTDIR" ]; then
  		echo "Creating dir"$OUTDIR
@@ -20,7 +20,7 @@ DOWNLOAD_PFR() {
 		for RUN in "${RUNS[@]}"; do
 			for LEAD in {3..12..3}; do
 				FNAME='E1E'$(date +%m%d -d "$DATE")$RUN'00'$(date +%m%d%H%M -d "$DATE + $LEAD hour")'1'
-				if [[ $NAME == $FNAME ]] && [ ! -f $outdir'/'$NAME'.nc' ]; then
+				if [[ $NAME == $FNAME ]] && [ ! -f $OUTDIR'/'$NAME'.nc' ]; then
 					echo $NAME' does not exist!'
 					curl -O $FTP_PATH'/'$NAME --user pfr_pull:$PFR_PSWD
 					grib_to_netcdf -o $NAME"_INT.nc" $NAME
