@@ -68,8 +68,6 @@ def aggregate_gpm(start, end):
         
 from dateutil.relativedelta import relativedelta
 
-for i in range(2, 13):
-    start = datetime(2016, 1, 1)
-    print(start, start + relativedelta(months=1))
-    print(np.arange(start, start + relativedelta(months=1), timedelta(hours=3)).astype(datetime))
+for i in range(1, 13):
+    start = datetime(2016, i, 1)
     aggregate_gpm(start, start + relativedelta(months=1))
