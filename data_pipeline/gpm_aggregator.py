@@ -3,7 +3,6 @@ import h5py
 import numpy as np
 from datetime import datetime
 from datetime import timedelta
-import time
 
 def get_gpm_filepaths(start, accum_steps):
     pattern = "/g/data/fj4/SatellitePrecip/GPM/global/final/{ym}/3B-HHR.MS.MRG.3IMERG.{ymd}-S{sHMS}-E{eHMS}.{mins_day:04d}.V05B.HDF5"
