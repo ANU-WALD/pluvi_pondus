@@ -1,23 +1,36 @@
-rm(list=ls())
+#!/bin/bash
 
-#####
-args    = commandArgs(trailingOnly=T)
-DOI     = as.Date(args[1])
-yyyymm  = format(DOI,'%Y%m')
-#####
+DOWNLOAD_GPM_LATE() {
+	FTP_PATH='ftp://jsimpson.pps.eosdis.nasa.gov/NRTPUB/imerg/late/'${1:0:6}
+	OUTDIR='/g/data/fj4/SatellitePrecip/GPM/global/late/'${1:0:6}
 
-prot = 'ftp://'
-svr = 'jsimpson.pps.eosdis.nasa.gov'
-pth = '/NRTPUB/imerg/late/'
+	if [ ! -d "$OUTDIR" ]; then
+ 		echo "Creating dir"$OUTDIR
+		mkdir $OUTDIR
+	fi
 
-OUTPUTDIR = paste0('/g/data/fj4/SatellitePrecip/GPM/global/late/',yyyymm)
-
-if (!dir.exists(OUTPUTDIR)) {
-        dir.create(OUTPUTDIR)
+	cd $OUTDIR
+	curl -l $FTP_PATH'/*' --user $NRT_ACCOUNT:$NRT_ACCOUNT | while read NAME; do 
+    		echo $NAME
+		if [[ $NAME == 3B-HHR-L.MS.MRG.3IMERG.$1* ]] && [ ! -f $OUTDIR'/'$NAME ]; then
+    			echo $NAME" Does not exist!"
+			curl -O $FTP_PATH'/'$NAME --user $NRT_ACCOUNT:$NRT_ACCOUNT
+		fi
+	done
 }
-setwd(OUTPUTDIR)
-commandText = paste0('/usr/bin/wget -nv -nd -N -o Download.log ',
-                     prot,'luigi.j.renzullo%40gmail.com:luigi.j.renzullo%40gmail.com',
-                     '@', svr, pth, yyyymm,'/3B*')
 
-system(commandText)
+if [ -z "$1" ]; then
+	# If no argument supplied the we update the collection"
+
+	#YESTERDAY
+	DATE=`date -d "yesterday 12:00" +%Y%m%d`
+	DOWNLOAD_GPM_LATE "$DATE"
+
+	#TODAY
+	DATE=`date +%Y%m%d`
+	DOWNLOAD_GPM_LATE "$DATE"
+else
+	# Else we download the specified date YYYYMMDD"
+	DOWNLOAD_GPM_LATE "$1"
+fi
+

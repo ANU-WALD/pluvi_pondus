@@ -10,7 +10,6 @@ DOWNLOAD_GPM_FINAL() {
 	fi
 
 	cd $OUTDIR
-	echo $FTP_PATH'/*'
 	curl -l $FTP_PATH'/*' --user $NRT_ACCOUNT:$NRT_ACCOUNT | while read NAME; do 
 		if [[ $NAME == 3B-HHR.MS.MRG.3IMERG.$1* ]] && [ ! -f $OUTDIR'/'$NAME ]; then
     			echo $NAME" Does not exist!"
