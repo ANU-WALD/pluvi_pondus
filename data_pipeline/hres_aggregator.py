@@ -23,8 +23,8 @@ def get_file_index(run, lead):
     return "/g/data/fj4/ECMWF/HRES/precip_{}.nc".format(run.strftime('%Y%m')), run_idx + lead
 
 
-def get_accum_prec(start, end):
-    timestamps = np.arange(start, end, timedelta(hours=1)).astype(datetime)
+def get_accum_prec(end, accum_h):
+    timestamps = np.arange(end - timedelta(hours=accum_h), end, timedelta(hours=1)).astype(datetime) + timedelta(hours=1)
     accum = np.zeros((1801, 3600))
 
     for t in timestamps:
@@ -37,36 +37,30 @@ def get_accum_prec(start, end):
     return accum
 
 
-def get_temporal_accum(start, end, accum_h):
-    timestamps = np.arange(start, end, timedelta(hours=accum_h)).astype(datetime)
-
-    prec_arr = np.empty((timestamps.shape[0], 721, 1440), dtype=np.float32)
+def get_temporal_accum(timestamps, accum_h):
+    prec_arr = np.empty((timestamps.shape[0], 1801, 3600), dtype=np.float32)
 
     for i, t in enumerate(timestamps):
-        acc = get_accum_prec(t + timedelta(hours=1), t + timedelta(hours=1+accum_h))
-        acc[accum<0.001] = 0
-        prec_arr[i, :, :] = (acc*1000).astype(np.float32)
+        acc = get_accum_prec(t, accum_h) * 1000
+        acc[acc < 0.001] = 0
+        prec_arr[i, :, :] = acc.astype(np.float32)
 
     return prec_arr
 
 
-def get_month_range(year, month):
+def get_month_range(year, month, accum_h):
+    start_date = datetime(year, month, 1, 3, 0)
+    end_date = start_date + timedelta(days=33)
+    end_date = end_date.replace(day=1)
 
-    start_date = datetime(year, month, 1, 0, 0)
-    last_day_month = start_date + timedelta(days=33)
-    last_day_month = last_day_month.replace(day=1)
-    last_day_month = last_day_month - timedelta(hours=3)
-
-    return start_date, last_day_month
+    return np.arange(start_date, end_date, timedelta(hours=accum_h)).astype(datetime)
 
 
 def aggregate_hres(year, month, accum_h):
 
     with netCDF4.Dataset("/g/data/fj4/ECMWF/HRES/prec_3h_accum_{}{:02d}.nc".format(year, month), 'w', format='NETCDF4') as dest:
-
-        start, end = get_month_range(2016, i)
-        timestamps = np.arange(start, end, timedelta(hours=accum_h)).astype(datetime)
-        prec_arr = get_temporal_accum(start, end, accum_h)
+        timestamps = get_month_range(year, month, accum_h)
+        prec_arr = get_temporal_accum(timestamps)
 
         setattr(dest, "date_created", datetime.now().strftime("%Y%m%dT%H%M%S"))
         setattr(dest, "Conventions", "CF-1.6")
@@ -85,12 +79,12 @@ def aggregate_hres(year, month, accum_h):
         var = dest.createVariable("longitude", "f8", ("longitude",))
         var.units = "degrees_east"
         var.long_name = "longitude"
-        var[:] = np.linspace(0, 359.75, 1440)
+        var[:] = np.linspace(-180, 179.9, 3600)
 
         var = dest.createVariable("latitude", "f8", ("latitude",))
         var.units = "degrees_north"
         var.long_name = "latitude"
-        var[:] = np.linspace(-90, 90, 721)
+        var[:] = np.linspace(-90, 90, 1801)
 
         var = dest.createVariable("tp", "f4", ("time", "latitude", "longitude"), fill_value=0, zlib=True, chunksizes=(8, 400, 400))
         var.long_name = "Total Precipitation"
