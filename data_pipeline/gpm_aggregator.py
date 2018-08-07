@@ -18,7 +18,7 @@ def get_accum_prec(end, accum_h):
     for t in timestamps:
         f_path = get_gpm_filepath(t)
         with h5py.File(f_path, mode='r') as f:
-            prec = f['Grid']['precipitationCal'][:].T
+            prec = f['Grid']['precipitationCal'][:].T[::-1, :]
             prec[prec == -9999.9] = np.nan
             accum = accum + prec
 
@@ -70,7 +70,7 @@ def aggregate_gpm(year, month, accum_h):
         var = dest.createVariable("latitude", "f8", ("latitude",))
         var.units = "degrees_north"
         var.long_name = "latitude"
-        var[:] = np.linspace(-89.95, 89.95, 1800)
+        var[:] = np.linspace(89.95, -89.95, 1800)
 
         var = dest.createVariable("precipitationCal", "f4", ("time", "latitude", "longitude"), fill_value=-9999.9, zlib=True, chunksizes=(8, 400, 400))
         var.long_name = "Precipitation Calibrated"

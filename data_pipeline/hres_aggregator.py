@@ -32,9 +32,9 @@ def get_accum_prec(end, accum_h):
         f_path, ti = get_file_index(run, lead)
         with netCDF4.Dataset(f_path, 'r', format='NETCDF4') as dest:
             if lead == 1:
-                accum += dest["tp"][ti, :, :]
+                accum += dest["tp"][ti, :, :][::-1, :]
             else:
-                accum += dest["tp"][ti, :, :] - dest["tp"][ti-1, :, :]
+                accum += (dest["tp"][ti, :, :] - dest["tp"][ti-1, :, :])[::-1, :]
 
     return accum
 
@@ -44,7 +44,7 @@ def get_temporal_accum(timestamps, accum_h):
 
     for i, t in enumerate(timestamps):
         acc = get_accum_prec(t, accum_h) * 1000
-        acc[acc < 0.001] = 0
+        acc[acc < 0.01] = 0
         prec_arr[i, :, :] = acc.astype(np.float32)
 
     return prec_arr
@@ -71,11 +71,11 @@ def aggregate_hres(year, month, accum_h):
         t_dim = dest.createDimension("time", prec_arr.shape[0])
 
         var = dest.createVariable("time", "f8", ("time",))
-        var.units = "seconds since 1970-01-01 00:00:00.0"
+        var.units = "seconds since 1900-01-01 00:00:00.0"
         var.calendar = "standard"
         var.long_name = "Time, unix time-stamp"
         var.standard_name = "time"
-        var[:] = netCDF4.date2num(timestamps, units="seconds since 1970-01-01 00:00:00.0", calendar="standard")
+        var[:] = netCDF4.date2num(timestamps, units="seconds since 1900-01-01 00:00:00.0", calendar="standard")
 
         var = dest.createVariable("longitude", "f8", ("longitude",))
         var.units = "degrees_east"
@@ -85,9 +85,9 @@ def aggregate_hres(year, month, accum_h):
         var = dest.createVariable("latitude", "f8", ("latitude",))
         var.units = "degrees_north"
         var.long_name = "latitude"
-        var[:] = np.linspace(-90, 90, 1801)
+        var[:] = np.linspace(90, -90, 1801)
 
-        var = dest.createVariable("tp", "f4", ("time", "latitude", "longitude"), fill_value=0, zlib=True, chunksizes=(8, 400, 400))
+        var = dest.createVariable("tp", "f4", ("time", "latitude", "longitude"), fill_value=-9999.9, zlib=True, chunksizes=(8, 400, 400))
         var.long_name = "Total Precipitation"
         var.units = 'mm'
         var[:] = prec_arr
