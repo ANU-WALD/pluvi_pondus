@@ -57,10 +57,9 @@ def get_month_range(year, month, accum_h):
 
 
 def aggregate_hres(year, month, accum_h):
-
     with netCDF4.Dataset("/g/data/fj4/ECMWF/HRES/prec_3h_accum_{}{:02d}.nc".format(year, month), 'w', format='NETCDF4') as dest:
         timestamps = get_month_range(year, month, accum_h)
-        prec_arr = get_temporal_accum(timestamps)
+        prec_arr = get_temporal_accum(timestamps, accum_h)
 
         setattr(dest, "date_created", datetime.now().strftime("%Y%m%dT%H%M%S"))
         setattr(dest, "Conventions", "CF-1.6")
@@ -92,5 +91,5 @@ def aggregate_hres(year, month, accum_h):
         var[:] = prec_arr
 
 
-for i in range(1, 2):
-    aggregate_hres(2016, i, 3)
+for i in range(1, 13):
+    aggregate_hres(2017, i, 3)
