@@ -14,8 +14,8 @@ def monthly_range(start_date, end_date):
         
 server = ECMWFDataServer()
 
-start_date = date(2017, 1, 1)
-end_date = date(2018, 1, 1)
+start_date = date(2018, 1, 1)
+end_date = date(2018, 2, 1)
 for (d0, d1) in monthly_range(start_date, end_date):
     server.retrieve({
         "type": "fc",
