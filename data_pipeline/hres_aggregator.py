@@ -31,8 +31,10 @@ def get_accum_prec(end, accum_h):
         run, lead = get_run_lead(t)
         f_path, ti = get_file_index(run, lead)
         with netCDF4.Dataset(f_path, 'r', format='NETCDF4') as dest:
-            print(t, dest["tp"][ti, :, :].max(), dest["tp"][ti, :, :].min())
-            accum += dest["tp"][ti, :, :]
+            if lead == 1:
+                accum += dest["tp"][ti, :, :]
+            else:
+                accum += dest["tp"][ti, :, :] - dest["tp"][ti-1, :, :]
 
     return accum
 
