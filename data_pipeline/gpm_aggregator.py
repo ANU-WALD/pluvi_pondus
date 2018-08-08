@@ -51,9 +51,9 @@ def aggregate_gpm(year, month, accum_h):
         setattr(dest, "date_created", datetime.now().strftime("%Y%m%dT%H%M%S"))
         setattr(dest, "Conventions", "CF-1.6")
 
-        x_dim = dest.createDimension("longitude", prec_arr.shape[2])
-        y_dim = dest.createDimension("latitude", prec_arr.shape[1])
-        t_dim = dest.createDimension("time", prec_arr.shape[0])
+        x_dim = dest.createDimension("longitude", prec_accum.shape[2])
+        y_dim = dest.createDimension("latitude", prec_accum.shape[1])
+        t_dim = dest.createDimension("time", prec_accum.shape[0])
 
         var = dest.createVariable("time", "f8", ("time",))
         var.units = "seconds since 1900-01-01 00:00:00.0"
@@ -81,5 +81,4 @@ def aggregate_gpm(year, month, accum_h):
 from dateutil.relativedelta import relativedelta
 
 for i in range(1, 13):
-    start = datetime(2016, i, 1)
-    aggregate_gpm(start, start + relativedelta(months=1))
+    aggregate_gpm(2017, i, 3)
