@@ -4,22 +4,21 @@ from datetime import datetime
 from datetime import timedelta
 
 def get_run_lead(t):
-
-    if 0 <= t.hour <= 6:
-        t_run = t - timedelta(hours=24)
-        return t_run.replace(hour=18), 6 + t.hour
-
-    elif 7 <= t.hour <= 18:
+    if 0 < t.hour < 13:
         t_run = t
-        return t_run.replace(hour=6), t.hour - 6
-
-    elif 19 <= t.hour <= 23:
+        return t_run.replace(hour=0), t.hour
+    
+    elif 0 == t.hour:
         t_run = t
-        return t_run.replace(hour=18), t.hour - 18
+        return t_run.replace(hour=12), 12
+    
+    elif t.hour < 24:
+        t_run = t
+        return t_run.replace(hour=12), t.hour - 12
 
 
 def get_file_index(run, lead):
-    run_idx = int((run - datetime(run.year, run.month, 1, 7)).total_seconds() / 3600)
+    run_idx = int((run - datetime(run.year, run.month, 1, 1)).total_seconds() / 3600)
     return "/g/data/fj4/ECMWF/HRES/precip_{}.nc".format(run.strftime('%Y%m')), run_idx + lead
 
 
@@ -29,6 +28,7 @@ def get_accum_prec(end, accum_h):
 
     for t in timestamps:
         run, lead = get_run_lead(t)
+        print(t, run, lead)
         f_path, ti = get_file_index(run, lead)
         with netCDF4.Dataset(f_path, 'r', format='NETCDF4') as dest:
             if lead == 1:
@@ -95,3 +95,4 @@ def aggregate_hres(year, month, accum_h):
 
 for i in range(1, 13):
     aggregate_hres(2017, i, 3)
+
