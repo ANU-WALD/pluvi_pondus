@@ -32,9 +32,9 @@ def get_accum_prec(end, accum_h):
         f_path, ti = get_file_index(run, lead)
         with netCDF4.Dataset(f_path, 'r', format='NETCDF4') as dest:
             if lead == 1:
-                accum += dest["tp"][ti, :, :][::-1, :]
+                accum += dest["tp"][ti, :, :]
             else:
-                accum += (dest["tp"][ti, :, :] - dest["tp"][ti-1, :, :])[::-1, :]
+                accum += dest["tp"][ti, :, :] - dest["tp"][ti-1, :, :]
 
     return accum
 
@@ -80,7 +80,7 @@ def aggregate_hres(year, month, accum_h):
         var = dest.createVariable("longitude", "f8", ("longitude",))
         var.units = "degrees_east"
         var.long_name = "longitude"
-        var[:] = np.linspace(-180, 179.9, 3600)
+        var[:] = np.linspace(0, 359.9, 3600)
 
         var = dest.createVariable("latitude", "f8", ("latitude",))
         var.units = "degrees_north"
