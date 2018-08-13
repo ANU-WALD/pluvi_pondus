@@ -31,7 +31,7 @@ def get_accum_prec(end, accum_h):
         run, lead = get_run_lead(t)
         f_path, ti = get_file_index(run, lead)
         with netCDF4.Dataset(f_path, 'r', format='NETCDF4') as dest:
-            accum += dest["tp"][ti, :, :][::-1, :]
+            accum += dest["tp"][ti, :, :]
 
     return accum
 
@@ -78,6 +78,7 @@ def aggregate_era5(year, month, accum_h):
         var = dest.createVariable("longitude", "f8", ("longitude",))
         var.units = "degrees_east"
         var.long_name = "longitude"
+        #var[:] = np.linspace(0, 359.75, 1440)
         var[:] = np.linspace(-180, 179.75, 1440)
 
         var = dest.createVariable("latitude", "f8", ("latitude",))
@@ -88,8 +89,9 @@ def aggregate_era5(year, month, accum_h):
         var = dest.createVariable("tp", "f4", ("time", "latitude", "longitude"), fill_value=9999.9, zlib=True, chunksizes=(8, 400, 400))
         var.long_name = "Total Precipitation"
         var.units = 'mm'
-        var[:] = prec_arr
+        #var[:] = prec_arr
+        var[:] = np.roll(prec_arr, 720, axis=2)
 
 
 for i in range(1, 13):
-    aggregate_era5(2016, i, 3)
+    aggregate_era5(2017, i, 3)

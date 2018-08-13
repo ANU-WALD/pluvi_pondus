@@ -80,7 +80,8 @@ def aggregate_hres(year, month, accum_h):
         var = dest.createVariable("longitude", "f8", ("longitude",))
         var.units = "degrees_east"
         var.long_name = "longitude"
-        var[:] = np.linspace(0, 359.9, 3600)
+        #var[:] = np.linspace(0, 359.9, 3600)
+        var[:] = np.linspace(-180, 179.9, 3600)
 
         var = dest.createVariable("latitude", "f8", ("latitude",))
         var.units = "degrees_north"
@@ -90,7 +91,8 @@ def aggregate_hres(year, month, accum_h):
         var = dest.createVariable("tp", "f4", ("time", "latitude", "longitude"), fill_value=-9999.9, zlib=True, chunksizes=(8, 400, 400))
         var.long_name = "Total Precipitation"
         var.units = 'mm'
-        var[:] = prec_arr
+        #var[:] = prec_arr
+        var[:] = np.roll(prec_arr, 1800, axis=2)
 
 
 for i in range(1, 13):
