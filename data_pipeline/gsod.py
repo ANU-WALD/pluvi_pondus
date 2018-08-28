@@ -1,17 +1,18 @@
 import numpy as np
 import pandas as pd
 import os
+import sys
 import netCDF4
 from datetime import datetime
 import argparse
 import tarfile
 import glob
 
-def get_gsod_dataframe(filename):
+def get_gsod_dataframe(fname, year):
 
     col_names = ['STN---', 'WBAN', 'YEARMODA', 'TEMP', 'nTEMP', 'DEWP', 'nDEWP', 'SLP', 'nSLP', 'STP', 'nSTP', 'VISIB', 'nVISIB', 'WDSP', 'nWDSP', 'MXSPD', 'GUST', 'MAX', 'MIN', 'PRCP', 'SNDP', 'FRSHTT']
-    df = pd.read_csv(filename, compression='gzip', header=None, names=col_names, skiprows=1, index_col=2, dtype=object, sep=r'\s{1,}', parse_dates=[2])
-    df = df.reindex(pd.date_range('01-01-2015', '31-12-2015'), fill_value=np.NaN)
+    df = pd.read_csv(fname, compression='gzip', header=None, names=col_names, skiprows=1, index_col=2, dtype=object, sep=r'\s{1,}', parse_dates=[2])
+    df = df.reindex(pd.date_range('01-01-{}'.format(year), '31-12-{}'.format(year)), fill_value=np.NaN)
     #df.index.names = ['time']
     df = df.drop(['STN---', 'WBAN'], axis=1)
     df['TEMP'] = df['TEMP'].replace('9999.9',np.NaN)
@@ -54,7 +55,8 @@ def get_gsod_dataframe(filename):
 
 def write_netcdf(nc_filename, dfs):
     with netCDF4.Dataset(nc_filename, 'w', format='NETCDF4') as dest:
-        t_dim = dest.createDimension("time", 365)
+        times = dfs[10010].index.values.tolist()
+        t_dim = dest.createDimension("time", len(times))
         station_dim = dest.createDimension("station", len(list(dfs.keys())))
 
         var = dest.createVariable("time", "f8", ("time",))
@@ -62,7 +64,8 @@ def write_netcdf(nc_filename, dfs):
         var.calendar = "standard"
         var.long_name = "Time, unix time-stamp"
         var.standard_name = "time"
-        var[:] = netCDF4.date2num([datetime.fromtimestamp(t // 1000000000) for t in dfs[10100].index.values.tolist()], units="seconds since 1970-01-01 00:00:00.0", calendar="standard")
+        print(len(dfs[10010].index.values.tolist()), times)
+        var[:] = netCDF4.date2num([datetime.fromtimestamp(t // 1000000000) for t in times], units="seconds since 1970-01-01 00:00:00.0", calendar="standard")
         
         var = dest.createVariable("station", "i4", ("station",))
         var.long_name = "WMO Station ID"
@@ -72,7 +75,7 @@ def write_netcdf(nc_filename, dfs):
         var = dest.createVariable("precip", "f4", ("time", "station"), fill_value=np.nan)
         var.long_name = "24h precipitation"
         var.units = 'mm'
-        arr = np.zeros((365, len(list(dfs.keys()))))
+        arr = np.zeros((len(times), len(list(dfs.keys()))))
     
         i=0
         for key, df in dfs.items():
@@ -84,7 +87,7 @@ def write_netcdf(nc_filename, dfs):
     
         var = dest.createVariable("t_precip", "i", ("time", "station"), fill_value=255)
         var.long_name = "24h precipitation accumulation mode"
-        arr = np.zeros((365, len(list(dfs.keys()))))
+        arr = np.zeros((len(times), len(list(dfs.keys()))))
     
         i=0
         for key, df in dfs.items():
@@ -97,7 +100,7 @@ def write_netcdf(nc_filename, dfs):
         var = dest.createVariable("mean_temp", "f4", ("time", "station"), fill_value=np.nan)
         var.long_name = "24h mean temperature"
         var.units = 'F'
-        arr = np.zeros((365, len(list(dfs.keys()))))
+        arr = np.zeros((len(times), len(list(dfs.keys()))))
     
         i=0
         for key, df in dfs.items():
@@ -109,30 +112,66 @@ def write_netcdf(nc_filename, dfs):
 
 
 if __name__ == "__main__":
+    """
+    Usage: gsod.py should be called by the gsod.ksh script which checks for updated GSOD files
+    downloads them and then this script outputs a netCDF4 version of these files.
+
+    arguments:
+      -in, --input_filename     Specifies the path to the file containing the list of GSOD files
+                                to be updated, one per line. It's default value is "updatedFiles"
+                                which the gsod.ksh script writes.
+      -out, --output_filename   Specifies the path to the netCDF4 file with the year GSOD data
+                                written by this script.
+    """
+
     parser = argparse.ArgumentParser(description='Description of your program')
-    parser.add_argument('-in', '--input_filename', help='GSOD input file name', type=str, required=True)
-    parser.add_argument('-out', '--output_filename', help='GSOD netcdf4 file name', type=str, required=True)
+    parser.add_argument('-in', '--input_filename', help='GSOD input file name', default="updatedFiles", type=str, required=False)
+    parser.add_argument('-out', '--output_path', help='Path to the location where GSOD netcdf4 file are written', default="./", type=str, required=False)
     args = vars(parser.parse_args())
 
+    if not os.path.exists(args["input_filename"]):
+        print("The input file does not exists")
+        sys.exit(1)
+    
     if not os.path.exists('tmp'):
         os.makedirs('tmp')
-    else:
-        files = glob.glob('tmp/*')
-        for f in files:
-            os.remove(f)
+ 
+    with open(args["input_filename"]) as f:
+        fnames = f.readlines()
+        for fname in fnames:
+            fname = fname.rstrip('\n')
+            name, ext = os.path.splitext(fname)
+           
+            print(len(name.split("_")) == 2, name.split("_")[0] == "gsod",  name.split("_")[1].isdigit())
+            if not (len(name.split("_")) == 2 and name.split("_")[0] == "gsod" and name.split("_")[1].isdigit()):
+                print("The file names specified in the input file don't have the expected format 'GSOD_YEAR.tar'")
+                sys.exit(1)
 
-    if (args["input_filename"].endswith(".tar")):
-        tar = tarfile.open(args["input_filename"])
-        tar.extractall(path='tmp')
-        tar.close()
-        print "Extracted in Current Directory"
+            year = int(name.split("_")[1])
 
+            tmp_files = glob.glob('tmp/*')
+            for tmp_f in tmp_files:
+                os.remove(tmp_f)
 
-    dfs = {}
+            print(fname)
+            if not fname.endswith(".tar"):
+                print("The files specified in the input file should have tar extension")
+                sys.exit(1)
+            
+            tar = tarfile.open(fname)
+            tar.extractall(path='tmp')
+            tar.close()
+            print("Extracted in Current Directory")
 
-    for i, filename in enumerate(os.listdir("tmp/")):
-        if filename.endswith(".gz"): 
-            if filename[:6] != "999999":
-                dfs[int(filename[:6])] = get_gsod_dataframe("tmp/" + filename)
+            dfs = {}
 
-    write_netcdf(args["output_filename"], dfs)
+            for i, gzfname in enumerate(os.listdir("tmp/")):
+                if not gzfname.endswith(".gz") or gzfname[:6] == "999999":
+                    continue
+                    print("-not processed-", gzfname)
+            
+                dfs[int(gzfname[:6])] = get_gsod_dataframe(os.path.join("tmp/", gzfname), year)
+            
+            nc_name = name + ".nc"
+            write_netcdf(os.path.join(args["output_path"], nc_name) , dfs)
+
