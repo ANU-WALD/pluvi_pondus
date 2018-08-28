@@ -64,7 +64,6 @@ def write_netcdf(nc_filename, dfs):
         var.calendar = "standard"
         var.long_name = "Time, unix time-stamp"
         var.standard_name = "time"
-        print(len(dfs[10010].index.values.tolist()), times)
         var[:] = netCDF4.date2num([datetime.fromtimestamp(t // 1000000000) for t in times], units="seconds since 1970-01-01 00:00:00.0", calendar="standard")
         
         var = dest.createVariable("station", "i4", ("station",))
@@ -168,7 +167,6 @@ if __name__ == "__main__":
             for i, gzfname in enumerate(os.listdir("tmp/")):
                 if not gzfname.endswith(".gz") or gzfname[:6] == "999999":
                     continue
-                    print("-not processed-", gzfname)
             
                 dfs[int(gzfname[:6])] = get_gsod_dataframe(os.path.join("tmp/", gzfname), year)
             
