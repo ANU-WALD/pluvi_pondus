@@ -1,11 +1,8 @@
 import netCDF4
 import numpy as np
 import os
+import scipy.ndimage
 from datetime import timedelta, datetime
-
-def daterange(start_date, end_date):
-    for n in range(int ((end_date - start_date).minutes)/30):
-        yield start_date + timedelta(n*30)
 
 start_date = datetime(2017, 1, 1)
 end_date = datetime(2017, 2, 1)
@@ -17,6 +14,15 @@ himb4_stack = None
 himb5_stack = None
 himb6_stack = None
 himb7_stack = None
+himb8_stack = None
+himb9_stack = None
+himb10_stack = None
+himb11_stack = None
+himb12_stack = None
+himb13_stack = None
+himb14_stack = None
+himb15_stack = None
+himb16_stack = None
 gpm_stack = None
 
 while start_date <= end_date:
@@ -24,13 +30,18 @@ while start_date <= end_date:
     f_him = "/g/data/fj4/scratch/him8_cnn/HIM8_{0}_SW_AU.nc".format(start_date.strftime("%Y%m%d%H%M"))
     if not os.path.isfile(f_him) or not os.path.isfile(f_gpm):
         print("timestamp", start_date, "not found")
+        start_date = start_date + timedelta(minutes=30)
         continue
 
     with netCDF4.Dataset(f_gpm, 'r', format='NETCDF4') as src:
+        # Output: 504, 952
+        # Output: 504, 1000
+        upsmpld = scipy.ndimage.zoom(src["precipitationCal"][:], [5.04, 5], order=1)
+        print(upsmpld.shape, "has to be 504,1000")
         if gpm_stack is None:
-            gpm_stack = src["lfmc_mean"][:]
+            gpm_stack = upsmpld
         else:
-            gpm_stack = np.vstack((gpm_stack, src["lfmc_mean"][:]))
+            gpm_stack = np.vstack((gpm_stack, upsmpld))
 
     with netCDF4.Dataset(f_him, 'r', format='NETCDF4') as src:
         print(f_him)
@@ -77,7 +88,4 @@ np.savez("/g/data/fj4/scratch/x", himb1_stack, himb2_stack, himb3_stack, himb4_s
                                   himb9_stack, himb10_stack, himb11_stack, himb12_stack, 
                                   himb13_stack, himb14_stack, himb15_stack, himb16_stack)
 
-np.savez("/g/data/fj4/scratch/y", gpm_stack)
-
-print(himb1_stack.shape)
-print(gpm_stack.shape)
+np.savez("/g/data/fj4/scratch/y", gpm_stack.data)
