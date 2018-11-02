@@ -2,10 +2,11 @@ import netCDF4
 import numpy as np
 import os
 import scipy.ndimage
+from skimage.transform import resize
 from datetime import timedelta, datetime
 
-start_date = datetime(2017, 1, 1)
-end_date = datetime(2017, 2, 1)
+start_date = datetime(2018, 3, 1)
+end_date = datetime(2018, 4, 1)
 
 himb1_stack = None
 himb2_stack = None
@@ -36,8 +37,10 @@ while start_date <= end_date:
     with netCDF4.Dataset(f_gpm, 'r', format='NETCDF4') as src:
         # Output: 504, 952
         # Output: 504, 1000
-        upsmpld = scipy.ndimage.zoom(src["precipitationCal"][:], [5.04, 5], order=1)
-        print(upsmpld.shape, "has to be 504,1000")
+        small = src["precipitationCal"][:]
+        #upsmpld = scipy.ndimage.zoom(small, [1, 5.04, 5], order=2, mode='nearest')
+        upsmpld = resize(small, [1, 504, 1000], mode='edge', preserve_range=True).astype(np.float32)
+        
         if gpm_stack is None:
             gpm_stack = upsmpld
         else:
@@ -80,7 +83,6 @@ while start_date <= end_date:
             himb14_stack = np.vstack((himb14_stack, np.expand_dims(src["B14"][:], axis=0)))
             himb15_stack = np.vstack((himb15_stack, np.expand_dims(src["B15"][:], axis=0)))
             himb16_stack = np.vstack((himb16_stack, np.expand_dims(src["B16"][:], axis=0)))
-
     start_date = start_date + timedelta(minutes=30)
 
 np.savez("/g/data/fj4/scratch/x", himb1_stack, himb2_stack, himb3_stack, himb4_stack, 
