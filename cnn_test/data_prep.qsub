@@ -2,8 +2,8 @@
 #PBS -P ai53
 #PBS -q normal
 #PBS -l ncpus=1
-#PBS -l mem=128GB
+#PBS -l mem=32GB
 #PBS -l walltime=12:00:00
 
 cd /home/603/pl5189/github/pluvi_pondus/cnn_test
-/g/data1/xc0/software/conda-envs/rs3/bin/python data_prep.py
+/g/data/xc0/software/python/miniconda3/bin/python data_prep.py

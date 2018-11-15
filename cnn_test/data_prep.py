@@ -5,8 +5,8 @@ import scipy.ndimage
 from skimage.transform import resize
 from datetime import timedelta, datetime
 
-start_date = datetime(2018, 3, 1)
-end_date = datetime(2018, 4, 1)
+start_date = datetime(2018, 1, 1)
+end_date = datetime(2018, 2, 1)
 
 himb1_stack = None
 himb2_stack = None
@@ -25,6 +25,10 @@ himb14_stack = None
 himb15_stack = None
 himb16_stack = None
 gpm_stack = None
+gpm_stack_small = None
+
+
+ref_gpm = "/g/data/fj4/scratch/him8_cnn/GPM_201801121500_SW_AU.nc"
 
 while start_date <= end_date:
     f_gpm = "/g/data/fj4/scratch/him8_cnn/GPM_{0}_SW_AU.nc".format(start_date.strftime("%Y%m%d%H%M"))
@@ -35,17 +39,27 @@ while start_date <= end_date:
         continue
 
     with netCDF4.Dataset(f_gpm, 'r', format='NETCDF4') as src:
-        # Output: 504, 952
         # Output: 504, 1000
-        small = src["precipitationCal"][:]
-        #upsmpld = scipy.ndimage.zoom(small, [1, 5.04, 5], order=2, mode='nearest')
-        upsmpld = resize(small, [1, 504, 1000], mode='edge', preserve_range=True).astype(np.float32)
+        small = src["precipitationCal"][0,:]
+        small = np.rot90(small)
+        upsmpld = resize(small, [504, 1000], mode='edge', preserve_range=True).astype(np.float32)
         
+        print(small.max(), upsmpld.max(), small.mean(), upsmpld.mean())
+        upsmpld = upsmpld[None,:]
+        small = small[None,:]
+
+
         if gpm_stack is None:
             gpm_stack = upsmpld
+            gpm_stack_small = small
         else:
             gpm_stack = np.vstack((gpm_stack, upsmpld))
+            gpm_stack_small = np.vstack((gpm_stack_small, small))
+	
+        if f_gpm == ref_gpm:
+            print("AAAAA", gpm_stack.shape)
 
+    """
     with netCDF4.Dataset(f_him, 'r', format='NETCDF4') as src:
         print(f_him)
         print(src)
@@ -83,11 +97,15 @@ while start_date <= end_date:
             himb14_stack = np.vstack((himb14_stack, np.expand_dims(src["B14"][:], axis=0)))
             himb15_stack = np.vstack((himb15_stack, np.expand_dims(src["B15"][:], axis=0)))
             himb16_stack = np.vstack((himb16_stack, np.expand_dims(src["B16"][:], axis=0)))
+    """
     start_date = start_date + timedelta(minutes=30)
 
+"""
 np.savez("/g/data/fj4/scratch/x", himb1_stack, himb2_stack, himb3_stack, himb4_stack, 
                                   himb5_stack, himb6_stack, himb7_stack, himb8_stack, 
                                   himb9_stack, himb10_stack, himb11_stack, himb12_stack, 
                                   himb13_stack, himb14_stack, himb15_stack, himb16_stack)
+"""
 
 np.savez("/g/data/fj4/scratch/y", gpm_stack.data)
+np.savez("/g/data/fj4/scratch/y_orig", gpm_stack_small.data)

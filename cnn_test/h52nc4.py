@@ -22,6 +22,7 @@ if __name__ == "__main__":
         prec = f['//Grid/precipitationCal'][:]
         lon = f['//Grid/lon'][:]
         lat = f['//Grid/lat'][:]
+        print(prec.shape, lon.shape, lat.shape)
 
         with netCDF4.Dataset(args.output, 'w', format='NETCDF4_CLASSIC') as ds:
             t_dim = ds.createDimension("time", 1)
@@ -49,7 +50,7 @@ if __name__ == "__main__":
             var.axis = "Y"
             var[:] = lat
 
-            var = ds.createVariable("precipitationCal", 'f4', ("time", "lat", "lon"), fill_value=-9999.9)
+            var = ds.createVariable("precipitationCal", 'f4', ("time", "lon", "lat"), fill_value=-9999.9)
             var.long_name = "precipitationCal"
             var.units = 'mm'
             var[:] = prec[None,...]
