@@ -1,0 +1,8 @@
+#!/bin/bash
+#PBS -P ai53
+#PBS -q normal
+#PBS -l ncpus=1
+#PBS -l mem=128GB
+#PBS -l walltime=00:30:00
+
+/g/data/xc0/software/python/miniconda3/bin/python /home/603/pl5189/github/pluvi_pondus/cnn_test/nc2npy.py

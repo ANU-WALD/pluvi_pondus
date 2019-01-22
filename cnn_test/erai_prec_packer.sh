@@ -29,6 +29,7 @@ while [ "$DATE" != "$END" ]; do
 	#6.- Merge both back into one file
 	cdo mergetime /g/data/fj4/scratch/eu_tp_end_corr.nc /g/data/fj4/scratch/eu_tp_mid.nc /g/data/fj4/scratch/int_$(date +%Y%m%d%H%M -d "$DATE").nc
 	rm /g/data/fj4/scratch/eu_*.nc
+
 	DATE=$(date -ud "$DATE + 1 month")
 done
 

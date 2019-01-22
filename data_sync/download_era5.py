@@ -14,7 +14,7 @@ def monthly_range(start_date, end_date):
         
 server = ECMWFDataServer()
 
-start_date = date(2018, 5, 1)
+start_date = date(2018, 4, 1)
 end_date = date(2018, 7, 1)
 for (d0, d1) in monthly_range(start_date, end_date):
     server.retrieve({
@@ -30,5 +30,5 @@ for (d0, d1) in monthly_range(start_date, end_date):
         "time": "06:00:00/18:00:00",
         "grid": "0.25/0.25",
         "format": "netcdf",
-        "target": "/g/data1/fj4/ERA5/precip_{0}.nc".format(d0.strftime('%Y%m')),
+        "target": "/g/data1/fj4/ECMWF/ERA5/precip_{0}.nc".format(d0.strftime('%Y%m')),
     })
