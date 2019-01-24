@@ -31,32 +31,38 @@ def GetModel():
 
     return model
 
-#x = np.moveaxis(np.load("/home/pl5189/ERA5_HIM8_CNN/era5_z.npy"), 1, -1)[:,:240,:360,:]
-#np.save("/home/pl5189/ERA5_HIM8_CNN/era5_z_rec.npy", x)
 #him8 = np.load("/home/pl5189/ERA5_HIM8_CNN/him8_b8.npy")
 #np.save("/home/pl5189/ERA5_HIM8_CNN/era5_z_aux.npy", x)
 #x = np.load("/home/pl5189/ERA5_HIM8_CNN/era5_z_rec.npy")[:,:,:,2,None].copy()
 
-era5 = np.load("/scratch/director2107/ERA5_Data/ERA5_HIM8/era5_z_aux.npy")[:,:,:,0]
+#era5 = np.load("/scratch/director2107/ERA5_Data/ERA5_HIM8/era5_z_aux.npy")[:,:,:,0]
+#x = np.load("/scratch/director2107/ERA5_Data/ERA5_HIM8/era5_z_aux.npy")[:]
+x = np.load("/scratch/director2107/ERA5_Data/ERA5_HIM8/era5_z_rec.npy")[:,:,:,1:]
+#x = np.moveaxis(np.load("/scratch/director2107/ERA5_Data/ERA5_HIM8/era5_z.npy"), 1, -1)[:,:240,:360,:]
+#np.save("/scratch/director2107/ERA5_Data/ERA5_HIM8/era5_z_rec.npy", x)
+#print(x.shape)
+#sys.exit()
 y = 1000*np.load("/scratch/director2107/ERA5_Data/ERA5_HIM8/era5_tp.npy")[1:,:240, :360, None]
 
-idxs = np.arange(era5.shape[0])
+#idxs = np.arange(era5.shape[0])
+idxs = np.arange(x.shape[0])
 np.random.seed(0)
 np.random.shuffle(idxs)
 
 y = y[idxs, :]
+x = x[idxs, :]
 
 y_train = y[:20000, :]
 y_test = y[20000:, :]
 print(y_test.mean())
 
-#x_train = x[:20000, :]
-#x_test = x[20000:, :]
+x_train = x[:20000, :]
+x_test = x[20000:, :]
 
-#model = GetModel()
-#history = model.fit(x_train, y_train, batch_size=24, epochs=10, verbose=1, validation_data=(x_test, y_test))
+model = GetModel()
+history = model.fit(x_train, y_train, batch_size=24, epochs=20, verbose=1, validation_data=(x_test, y_test))
 
-#sys.exit()
+sys.exit()
 
 
 for i in range(7,16):
