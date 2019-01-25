@@ -7,20 +7,28 @@ import numpy as np
 def GetModel():
     model = Sequential()
     model.add(BatchNormalization(axis=3, input_shape=(2, 80, 120, 1)))
+    model.add(Conv3D(32, (2, 5, 5), strides=(1, 1, 1), activation='relu', padding='same'))
     model.add(Conv3D(32, (2, 5, 5), strides=(1, 2, 2), activation='relu', padding='same'))
     model.add(BatchNormalization(axis=3))
+    model.add(Conv3D(64, (3, 3, 3), strides=(1, 1, 1), activation='relu', padding='same'))
     model.add(Conv3D(64, (3, 3, 3), strides=(1, 2, 2), activation='relu', padding='same'))
     model.add(BatchNormalization(axis=3))
+    model.add(Conv3D(128, (3, 3, 3), strides=(1, 1, 1), activation='relu', padding='same'))
     model.add(Conv3D(128, (3, 3, 3), strides=(1, 2, 2), activation='relu', padding='same'))
     model.add(BatchNormalization(axis=3))
+    model.add(Conv3D(256, (3, 5, 5), strides=(1, 1, 1), activation='relu', padding='same'))
     model.add(Conv3D(256, (3, 5, 5), strides=(1, 2, 3), activation='relu', padding='same'))
     model.add(BatchNormalization(axis=3))
+    model.add(Conv3DTranspose(128, (3, 5, 5), strides=(1, 1, 1), activation='relu', padding='same'))
     model.add(Conv3DTranspose(128, (3, 5, 5), strides=(1, 2, 3), activation='relu', padding='same'))
     model.add(BatchNormalization(axis=3))
+    model.add(Conv3DTranspose(64, (3, 3, 3), strides=(1, 1, 1), activation='relu', padding='same'))
     model.add(Conv3DTranspose(64, (3, 3, 3), strides=(1, 2, 2), activation='relu', padding='same'))
     model.add(BatchNormalization(axis=3))
+    model.add(Conv3DTranspose(32, (3, 3, 3), strides=(1, 1, 1), activation='relu', padding='same'))
     model.add(Conv3DTranspose(32, (3, 3, 3), strides=(1, 2, 2), activation='relu', padding='same'))
     model.add(BatchNormalization(axis=3))
+    model.add(Conv3DTranspose(1, (2, 5, 5), strides=(1, 1, 1), activation='relu', padding='same'))
     model.add(Conv3DTranspose(1, (2, 5, 5), strides=(1, 2, 2), activation='relu', padding='same'))
     model.add(Conv3D(1, (1, 1, 1), strides=(2, 1, 1), activation='relu', padding='same'))
 
@@ -42,11 +50,16 @@ z500 = np.load("/scratch/director2107/ERA5_Data/ERA5_HIM8/500_geopotential.npy")
 print(z500[:-2,:] - z500[1:-1,:])
 print(np.mean(z500[:-2,:] - z500[1:-1,:]))
 print(np.mean(np.abs(z500[:-1] - z500[1:])))
-sys.exit()
 
 x = np.stack([z500[:-2,:], z500[1:-1,:]], axis=1)[:, :, :, :, None]
 y = z500[2:, :][:, None, :, :, None]
 
+idxs = np.arange(x.shape[0])
+np.random.seed(0)
+np.random.shuffle(idxs)
+
+y = y[idxs, :]
+x = x[idxs, :]
 
 y_train = y[:40000, :]
 y_test = y[40000:, :]
@@ -55,4 +68,4 @@ x_train = x[:40000, :]
 x_test = x[40000:, :]
 
 model = GetModel()
-history = model.fit(x_train, y_train, batch_size=24, epochs=20, verbose=1, validation_data=(x_test, y_test))
+history = model.fit(x_train, y_train, batch_size=24, epochs=40, verbose=1, validation_data=(x_test, y_test))
