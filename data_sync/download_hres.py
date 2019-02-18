@@ -14,8 +14,8 @@ def monthly_range(start_date, end_date):
         yield start_date, last_day_month
         start_date = last_day_month + timedelta(days=1)
         
-start_date = date(2016, 1, 1)
-end_date = date(2018, 1, 1)
+start_date = date(2019, 1, 1)
+end_date = date(2019, 2, 1)
 for (d0, d1) in monthly_range(start_date, end_date):
     req = """retrieve,
     class   = od,
