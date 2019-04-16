@@ -3,11 +3,39 @@
 module load grib_api
 module load netcdf
 RUNS=("00" "12")
+OUTDIR='/g/data/ub8/global/Precipitation/NWP'
+FTP_PATH='ftp://dissemination.ecmwf.int/'
+
+echo $PFR_PSWD
 
 DOWNLOAD_PFR() {
+	#curl --user pfr_pull:kmjnhb04 -O ftp://dissemination.ecmwf.int/20190414/E1D04140000041518001
+	#E1D04141200041521001
 
-	FTP_PATH='ftp://dissemination.ecmwf.int/DATA/PFR/'$1
-	OUTDIR='/g/data/fj4/ECMWF/OP_ENS'
+	echo $1
+	for RUN in {00,12}; do
+		DATE=$(date -d "$1 + $RUN hour")
+		for LEAD in {3..12..3}; do
+			DATE=$(date -d "$DATE + 3 hour")
+			FMT_DATE=$(date -d "$1" +%m%d)
+			FMT_LEAD=$(date -d "$DATE" +%m%d%H%M)
+			FNAME="E1D"$FMT_DATE$RUN"00"$FMT_LEAD"1"
+                        if [ -f $OUTDIR"/"$FNAME".nc" ]; then
+				echo "File "$FNAME".nc is already available"
+				continue
+			fi
+			echo $FTP_PATH$1"/"$FNAME
+			curl --user pfr_pull:$PFR_PSWD --head $FTP_PATH$1"/"$FNAME
+			if [[ ! $? -eq 0 ]]; then
+				echo "File "$FNAME" does not exists"
+				continue
+			fi
+			curl --user pfr_pull:$PFR_PSWD -O $FTP_PATH$1"/"$FNAME
+			grib_to_netcdf -o $OUTDIR"/"$FNAME".nc" $FNAME
+			rm $FNAME
+		done
+	done
+	return
 
 	if [ ! -d "$OUTDIR" ]; then
  		echo "Creating dir"$OUTDIR
