@@ -9,7 +9,6 @@ if len(sys.argv) != 2:
     sys.exit(1)
 
 date = sys.argv[1]
-date = "20190416"
 
 def get_precip(fname):
     p = None

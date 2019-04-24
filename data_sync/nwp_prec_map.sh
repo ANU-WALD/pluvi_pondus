@@ -26,7 +26,7 @@ DOWNLOAD_PFR() {
 			echo $IM_NAME
                         if [ -f $IM_NAME ]; then
 				echo "File "$IM_NAME" is already available"
-				continue
+				#continue
 			fi
                         if [ ! -f $OUTDIR"/"$FNAME".nc" ]; then
 				curl --user pfr_pull:$PFR_PSWD --head $FTP_PATH$1"/"$FNAME
@@ -40,6 +40,7 @@ DOWNLOAD_PFR() {
 			fi
 			/g/data/xc0/software/python/miniconda3/bin/python nwp_prec_map.py $OUTDIR"/"$FNAME".nc" $IM_NAME
 			gsutil cp $IM_NAME gs://pluvi_pondus/
+			gsutil cp "CP-"$IM_NAME gs://pluvi_pondus/
 		done
 	done
 }

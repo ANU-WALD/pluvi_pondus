@@ -19,9 +19,10 @@ DOWNLOAD_GPM_EARLY() {
 
 		FNAME="3B-HHR-E.MS.MRG.3IMERG."$DATE"-S"$START"-E"$END"."`printf "%04d" $MINS`".V05B.RT-H5"
 		if [ ! -f $OUTDIR$FNAME ]; then
+			echo $FTP_PATH'/'$FNAME
 			curl --user  $NRT_ACCOUNT:$NRT_ACCOUNT --head $FTP_PATH"/"$FNAME
 			if [[ ! $? -eq 0 ]]; then
-				echo "File "$FNAME" does not exists"
+				echo "Remote file "$FNAME" does not exists"
 				continue
 			fi
 			curl -O $FTP_PATH'/'$FNAME --user $NRT_ACCOUNT:$NRT_ACCOUNT
@@ -33,10 +34,10 @@ DOWNLOAD_GPM_EARLY() {
 			continue
 		fi
 
-		/g/data/xc0/software/python/miniconda3/bin/python gpm_prec_map.py $OUTDIR$FNAME $IM_NAME
-		gsutil cp $IM_NAME gs://pluvi_pondus/
+		#/g/data/xc0/software/python/miniconda3/bin/python gpm_prec_map.py $OUTDIR$FNAME $IM_NAME
+		#gsutil cp $IM_NAME gs://pluvi_pondus/
 	done
-	
+
         /g/data/xc0/software/python/miniconda3/bin/python gpm_3hprec_map.py $DATE
 	gsutil cp GPM3H$DATE"*" gs://pluvi_pondus/
 }
