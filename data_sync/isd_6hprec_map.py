@@ -8,7 +8,7 @@ import sys
 import imageio
 
 #ftp://ftp.ncdc.noaa.gov/pub/data/noaa/isd-history.txt
-
+data_path = "ftp.ncdc.noaa.gov/pub/data/noaa/isd-lite/2019/"
 
 def update_station_list():
     if os.system('curl -o isd-history.csv ftp://ftp.ncdc.noaa.gov/pub/data/noaa/isd-history.csv') != 0:
@@ -27,23 +27,11 @@ def update_station_list():
     os.system('rm isd-history.csv')
 
 
-def update_country_list():
-    if os.system('curl -o country-list.txt ftp://ftp.ncdc.noaa.gov/pub/data/noaa/country-list.txt') != 0:
-        print("Error downloading country-list.txt file")
-        sys.exit(-1)
-
-    df = pd.read_fwf('country-list.txt')
-    df.drop([0], inplace=True)
-     
-    df.to_hdf('country-list.hdf', key='countries', mode='w')
-    os.system('rm country-list.txt')
-
-
-def get_prec(station_code, date_from, accum):
+def get_prec(station_code, date_start):
     col_names = ["year", "month", "day", "hour", "air temp", "dew point", "mslp", "wind dir", "wind speed", "sky cov", "1h prec", "6h prec"]
     df = None
     try:
-        df = pd.read_fwf('{}-2019.gz'.format(station_code), compression='gzip', header=None, names=col_names, parse_dates={'datetime': ['year', 'month', 'day', 'hour']})
+        df = pd.read_fwf(data_path + '{}-2019.gz'.format(station_code), compression='gzip', header=None, names=col_names, parse_dates={'datetime': ['year', 'month', 'day', 'hour']})
     except IOError:
         print('File not found.')
         return None
@@ -54,9 +42,14 @@ def get_prec(station_code, date_from, accum):
     df["6h prec"].replace(to_replace={-1: np.nan}, inplace=True)
     df["1h prec"].replace(to_replace={-1: np.nan}, inplace=True)
 
-    df = df.loc[(df['datetime'] >= date_from) & (df['datetime'] < date_from + datetime.timedelta(hours=accum))]
 
-    return max(np.nansum(df["6h prec"].values), np.nansum(df["1h prec"].values))
+    out = np.zeros(4, dtype=np.float32)
+    for i in range(4):
+        df = df.loc[(df['datetime'] >= date_start + datetime.timedelta(hours=i*6)) & (df['datetime'] < date_start + datetime.timedelta(hours=(i+1)*6))]
+        out[i] = max(np.nansum(df["6h prec"].values), np.nansum(df["1h prec"].values))
+
+    return out
+
 
 def get_stations(date_from):
     stations = pd.read_hdf("isd-history.hdf", key='stations')
@@ -67,34 +60,37 @@ def get_stations(date_from):
     return
 
 
-def raster_stations(date_from, accum, grid_size):
+def raster_stations(date_from, grid_size):
 
     min_x, min_y, max_x, max_y = -180.0, -90.0, 180.0, 90.0
     x_size = int((max_x - min_x) / grid_size)
     y_size = int((max_y - min_y) / grid_size)
-    print(x_size, y_size)
-    map = np.zeros((y_size, x_size), dtype=np.float32)
-    print(map.shape)
+    map_prec = np.zeros((4, y_size, x_size), dtype=np.float32)
 
     for station in get_stations(date_from):
-        prec = get_prec(station[0], d, accum)
+        prec = get_prec(station[0], date_from)
         i, j = int(np.floor((station[2] - min_x)/grid_size))-1, int(np.floor((max_y - station[1])/grid_size))-1
         if 0 >= i > x_size or 0 >= j > y_size:
-            print(i, j)
             continue
-        map[j, i] = prec
+        map_prec[:, j, i] = prec
 
-    return map
-
+    return map_prec
 
 if __name__ == "__main__":
-    for d in (datetime.datetime(2019, 4, 20) + datetime.timedelta(hours=n) for n in range(0,144,6)):
-        arr = raster_stations(d, 6, .1)
-        print(arr.max(), arr.min())
-        map = np.clip(arr, 0, 2*150)
-        norm_p = np.log(1 + map) / np.log(2*150)
-        im = np.zeros((map.shape[0], map.shape[1], 4), dtype=np.float32)
+    date = datetime.datetime.strptime(sys.argv[1], '%Y%m%d')
+    print(date)
+    
+    arr = raster_stations(date - datetime.timedelta(hours=24*3), .1)
+    print(arr.max(), arr.min())
+    prec_map = np.clip(arr, 0, 2*150)
+    prec_map += 1
+    prec_map = np.log(prec_map)
+    prec_map /= np.log(2*150)
+    
+    for i in range(4):
+        im = np.zeros((prec_map.shape[1], prec_map.shape[2], 4), dtype=np.float32)
         im[:, :, 2] = 1
-        im[:, :, 3] = norm_p
-        im = (im * 255).astype(np.uint8)
-        imageio.imwrite("ISD{}.png".format((d + datetime.timedelta(hours=6)).strftime("%Y%m%d%H%M")), im)
+        im[:, :, 3] = prec_map[i,:,:]
+        im *= 255
+        im = im.astype(np.uint8)
+        imageio.imwrite("ISD{}.png".format((date + datetime.timedelta(hours=(6*(i+1)))).strftime("%Y%m%d%H%M")), im)
