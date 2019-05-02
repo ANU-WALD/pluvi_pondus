@@ -13,7 +13,7 @@ date = sys.argv[1]
 def get_precip(fname):
     p = None
     with h5py.File(fname, mode='r') as f:
-        p = f['Grid']['precipitationCal'][:].T[::-1, :]
+        p = f['Grid']['precipitationCal'][:].T[::-1, :, 0]
         p[p == -9999.9] = 0
     return p
 
@@ -33,6 +33,8 @@ for i in range(8):
             p_total = p
             continue
         p_total += p
+
+    print(p_total.shape)
 
     p_total /= 2
     print(np.nanmin(p_total), np.nanmean(p_total), np.nanmax(p_total))

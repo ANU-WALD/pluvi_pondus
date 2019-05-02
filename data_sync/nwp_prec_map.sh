@@ -2,6 +2,8 @@
 
 module load grib_api
 module load netcdf
+module load gdal
+
 RUNS=("00" "12")
 OUTDIR='/g/data/ub8/global/Precipitation/NWP'
 FTP_PATH='ftp://dissemination.ecmwf.int/'

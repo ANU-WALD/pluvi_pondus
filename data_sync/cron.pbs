@@ -1,0 +1,15 @@
+#!/bin/bash
+
+#PBS -P xc0
+#PBS -a 1200
+#PBS -q copyq
+#PBS -l ncpus=1
+#PBS -l mem=1GB
+#PBS -l walltime=02:00:00
+
+cd /home/603/pl5189/github/pluvi_pondus/data_sync
+./export_vars.sh
+./nwp_prec_map.sh
+./gpm_prec_map.sh
+
+qsub cron.pbs

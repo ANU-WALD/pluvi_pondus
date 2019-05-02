@@ -2,6 +2,7 @@ import xarray as xr
 import numpy as np
 import sys
 import imageio
+import os
 
 if len(sys.argv) != 3:
     sys.exit(1)

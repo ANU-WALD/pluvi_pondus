@@ -1,4 +1,5 @@
 #!/bin/bash
+module load gdal
 
 OUTDIR="/g/data/fj4/SatellitePrecip/GPM/global/early/"
 
@@ -17,7 +18,7 @@ DOWNLOAD_GPM_EARLY() {
 		IM_NAME="GPM"$DATE$END_NAME".png"
 		echo $IM_NAME
 
-		FNAME="3B-HHR-E.MS.MRG.3IMERG."$DATE"-S"$START"-E"$END"."`printf "%04d" $MINS`".V05B.RT-H5"
+		FNAME="3B-HHR-E.MS.MRG.3IMERG."$DATE"-S"$START"-E"$END"."`printf "%04d" $MINS`".V06A.RT-H5"
 		if [ ! -f $OUTDIR$FNAME ]; then
 			echo $FTP_PATH'/'$FNAME
 			curl --user  $NRT_ACCOUNT:$NRT_ACCOUNT --head $FTP_PATH"/"$FNAME
@@ -53,9 +54,6 @@ if [ -z "$1" ]; then
 	DATE=`date -d "yesterday 12:00" +%Y%m%d`
 	DOWNLOAD_GPM_EARLY "$DATE"
 
-	#TODAY
-	DATE=`date +%Y%m%d`
-	DOWNLOAD_GPM_EARLY "$DATE"
 else
 	# Else we download the specified date YYYYMMDD"
 	DOWNLOAD_GPM_EARLY "$1"
