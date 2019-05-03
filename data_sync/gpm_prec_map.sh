@@ -41,6 +41,9 @@ DOWNLOAD_GPM_EARLY() {
 
         /g/data/xc0/software/python/miniconda3/bin/python gpm_3hprec_map.py $DATE
 	gsutil cp GPM3H$DATE"*" gs://pluvi_pondus/
+        
+	/g/data/xc0/software/python/miniconda3/bin/python merged_prec_map.py $DATE
+	gsutil cp MRG$DATE"*" gs://pluvi_pondus/
 }
 
 if [ -z "$1" ]; then
