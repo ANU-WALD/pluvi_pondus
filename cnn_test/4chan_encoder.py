@@ -36,9 +36,11 @@ def GetModel():
 #him8 = np.load("/home/pl5189/ERA5_HIM8_CNN/him8_b8.npy")
 #np.save("/home/pl5189/ERA5_HIM8_CNN/era5_z_aux.npy", x)
 #x = np.load("/home/pl5189/ERA5_HIM8_CNN/era5_z_rec.npy")[:,:,:,2,None].copy()
-era5 = np.load("/home/pl5189/ERA5_HIM8_CNN/era5_z_aux.npy")[:]
-him8 = np.load("/home/pl5189/ERA5_HIM8_CNN/him8_b7.npy")[1:, :, :, None]
-x = np.stack([him8, era5], axis=3)
+era5 = np.load("/home/pl5189/ERA5_HIM8_CNN/era5_z_aux.npy")[:, :, :, 0]
+print(era5.shape)
+him8 = np.load("/home/pl5189/ERA5_HIM8_CNN/him8_b7.npy")[1:, :, :]
+print(him8.shape)
+x = np.stack([him8, era5], axis=-1)
 print(x.shape)
 era5 = None
 him8 = None
