@@ -81,4 +81,4 @@ def aggregate_gpm(year, month, accum_h):
 from dateutil.relativedelta import relativedelta
 
 for i in range(1, 13):
-    aggregate_gpm(2017, i, 3)
+    aggregate_gpm(2017, i, 1)

@@ -1,10 +1,25 @@
-from netCDF4 import Dataset
+import xarray as xr
 import numpy as np
 
-tp = Dataset("/g/data/fj4/scratch/EU_TP_ERAI.nc", "r")["tp"][:]
+"""
+tp = xr.open_dataset("/g/data/fj4/scratch/AU_NATIVE_TP_ERA5.nc").tp[:].data.astype(np.float32)
 print(tp.shape)
-np.save("/g/data/fj4/scratch/eu_erai_y", tp.data.astype(np.float32))
+np.save("/g/data/fj4/scratch/tp_era5_au", tp[:, :, :])
+tp = None
 
-z = Dataset("/g/data/fj4/scratch/EU_Z_ERAI.nc", "r")["z"][:, 1, :, :]
+z = xr.open_dataset("/g/data/fj4/scratch/AU_NATIVE_Z_ERA5.nc").z[:].data.astype(np.float32)
 print(z.shape)
-np.save("/g/data/fj4/scratch/eu_erai_x", z.data.astype(np.float32))
+np.save("/g/data/fj4/scratch/z_era5_au", z[:, :, :, :])
+z = None
+
+z = xr.open_dataset("/g/data/fj4/scratch/AU_NATIVE_T_ERA5.nc").t[:].data.astype(np.float32)
+print(z.shape)
+np.save("/g/data/fj4/scratch/t_era5_au", z[:, :, :, :])
+z = None
+"""
+
+z = xr.open_dataset("/g/data/fj4/scratch/AU_NATIVE_RH_ERA5.nc").r[:].data.astype(np.float32)
+print(z.shape)
+np.save("/g/data/fj4/scratch/rh_era5_au", z[:, :, :, :])
+z = None
+
