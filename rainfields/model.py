@@ -3,10 +3,10 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam, SGD
 import numpy as np
 
-x = np.load("x.npy")[:10000000]
+x = np.load("xp.npy")[:10000000]
 print(x.shape)
 
-y = np.load("y.npy")[:10000000,None]
+y = np.load("yp.npy")[:10000000,None]
 print(y.shape)
 
 prec_mask = np.nonzero(y>0)
@@ -84,7 +84,7 @@ print(y_p.max(axis=0))
 
 
 classifier = Sequential()
-classifier.add(Dense(32, activation='relu', input_dim=2))
+classifier.add(Dense(32, activation='relu', input_dim=4))
 classifier.add(Dense(64, activation='relu'))
 classifier.add(Dense(128, activation='relu'))
 classifier.add(Dense(64, activation='relu'))
