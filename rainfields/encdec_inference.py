@@ -86,10 +86,10 @@ model = load_model('rainfields_model.h5', custom_objects={'mse_holes': mse_holes
 
 d = datetime(2018,11,1,10,0)
 i = 0
-for _ in range(6*24*6):
-    print(d)
+for index in range(6*24*6):
+    print(index, d)
     dp = d - timedelta(0,10*60)
-    crr_fp = "/data/pluvi_pondus/crr/310_{}_{}00.prcp-c10.nc".format(d.strftime("%Y%m%d"), d.strftime("%H%M"))
+    crr_fp = "/data/pluvi_pondus/crr/{}00-P1S-ABOM_CRR-PRJ_AEA132_2000-HIMAWARI8-AHI.nc".format(d.strftime("%Y%m%d%H%M"))
     rf_fp = "/data/pluvi_pondus/Rainfields/{}/310_{}_{}00.prcp-c10.npy".format(int(d.strftime("%d")), d.strftime("%Y%m%d"), d.strftime("%H%M"))
     b8_fp = "/data/pluvi_pondus/HIM8_AU_{}_B8_{}.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
     b14_fp = "/data/pluvi_pondus/HIM8_AU_{}_B14_{}.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
@@ -106,21 +106,23 @@ for _ in range(6*24*6):
     b14p = np.load(b14p_fp)[2::2, 402::2]
             
     prec = np.load(rf_fp)[2::2, 402::2]
-    
+    print("Rainfieds: ", np.nanmax(prec))
+   
     with xr.open_dataset(crr_fp) as ds:
-        crr = ds.precipitation.data[2::2, 402::2]
-        print(crr.max())
-        plt.imsave("crr_{:03d}.png".format(i), np.clip(crr,0,5), vmin=0, vmax=5, cmap=newcmp)
+        crr = ds.precipitation_flux.data[0, 2::2, 402::2]
+        print("CRR: ", np.nanmax(crr))
+        plt.imsave("crr_{:03d}.png".format(i), np.clip(crr,0,10), vmin=0, vmax=10, cmap=newcmp)
 
     x = np.stack((b8p,b14p,b8,b14), axis=-1)
     #imageio.imwrite("h8_b8_{:03d}.png".format(i), x[:,:,0])
     plt.imsave("h8_b8_{:03d}.png".format(i), x[:,:,0], cmap='gray')
     #imageio.imwrite("rainfields_{:03d}.png".format(i), np.clip(prec, 0, 5)/5)
-    plt.imsave("rainfields_{:03d}.png".format(i), np.clip(prec,0,5), vmin=0, vmax=5, cmap=newcmp)
+    plt.imsave("rainfields_{:03d}.png".format(i), np.clip(prec,0,10), vmin=0, vmax=10, cmap=newcmp)
 
     out = model.predict(x[None,:,:,:])
-    imageio.imwrite("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0], 0, 3)/3)
-    plt.imsave("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0],0,5), vmin=0, vmax=5, cmap=newcmp)
+    print("NN: ", out.max())
+    #imageio.imwrite("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0], 0, 3)/3)
+    plt.imsave("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0],0,10), vmin=0, vmax=10, cmap=newcmp)
     d += timedelta(0,10*60)
     i+=1
 
