@@ -12,6 +12,32 @@ from datetime import timedelta
 import random
 import os
 
+def get_model_memory_usage(batch_size, model):
+
+    shapes_mem_count = 0
+    for l in model.layers:
+        print(l.name)
+        print(l.output_shape)
+        single_layer_mem = 1
+        for s in l.output_shape:
+            if s is None:
+                continue
+            single_layer_mem *= s
+        shapes_mem_count += single_layer_mem
+
+    trainable_count = np.sum([K.count_params(p) for p in set(model.trainable_weights)])
+    non_trainable_count = np.sum([K.count_params(p) for p in set(model.non_trainable_weights)])
+
+    number_size = 4.0
+    if K.floatx() == 'float16':
+         number_size = 2.0
+    if K.floatx() == 'float64':
+         number_size = 8.0
+
+    total_memory = number_size*(batch_size*shapes_mem_count + trainable_count + non_trainable_count)
+    gbytes = np.round(total_memory / (1024.0 ** 3), 3)
+    return gbytes
+
 def mse_holes(y_true, y_pred):
     idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
     y_true = K.tf.gather_nd(y_true, idxs)
@@ -44,15 +70,23 @@ class DataGenerator(Sequence):
             
             if not os.path.exists(rf_fp) or not os.path.exists(b8_fp) or not os.path.exists(b8p_fp):
                 continue
-
+           
+            """
             b8 = np.load(b8_fp)[2::2, 402::2]
             b14 = np.load(b14_fp)[2::2, 402::2]
             b8p = np.load(b8p_fp)[2::2, 402::2]
             b14p = np.load(b14p_fp)[2::2, 402::2]
-            
             prec = np.load(rf_fp)[2::2, 402::2]
+            """
+            
+            b8 = np.load(b8_fp)[2:, 402:]
+            b14 = np.load(b14_fp)[2:, 402:]
+            b8p = np.load(b8p_fp)[2:, 402:]
+            b14p = np.load(b14p_fp)[2:, 402:]
+            prec = np.load(rf_fp)[2:, 402:]
 
             x.append(np.stack((b8p,b14p,b8,b14), axis=-1))
+            #x.append(np.stack((b8,b14), axis=-1))
             y.append(prec)
 
         x = np.stack(x, axis=0)
@@ -66,7 +100,8 @@ class DataGenerator(Sequence):
 
 def get_unet():
     concat_axis = 3
-    inputs = layers.Input(shape = (1024, 1024, 4))
+    #inputs = layers.Input(shape = (1024, 1024, 4))
+    inputs = layers.Input(shape = (2048,2048,4))
 
     feats = 16
     bn0 = BatchNormalization(axis=3)(inputs)
@@ -150,10 +185,13 @@ def get_unet():
 
     return model
 
-training_gen = DataGenerator(batch_size=4, length=400)
-validation_gen = DataGenerator(batch_size=4, length=24)
+training_gen = DataGenerator(batch_size=1, length=400)
+validation_gen = DataGenerator(batch_size=1, length=100)
 
 model = get_unet()
+print(get_model_memory_usage(1, model), "GBs")
+exit()
+
 #history = model.fit(x_train, y_train, epochs=50, batch_size=4, validation_data=(x_test, y_test))
 #history = model.fit_generator(generator=training_gen, validation_data=validation_gen, use_multiprocessing=True, workers=2)
 history = model.fit_generator(generator=training_gen, validation_data=validation_gen, epochs=100, max_queue_size=8, use_multiprocessing=True, workers=4)
