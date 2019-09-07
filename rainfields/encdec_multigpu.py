@@ -11,7 +11,6 @@ import xarray as xr
 from datetime import datetime
 from datetime import timedelta
 import pickle
-import random
 import os
 
 def get_model_memory_usage(batch_size, model):
@@ -60,8 +59,11 @@ class DataGenerator(Sequence):
         x = []
         y = []
 
+        a = []
         while len(y) < self.batch_size:
-            n = random.randint(1,6*24*6)
+            np.random.seed()
+            n = int(np.random.randint(1,6*24*6,size=1)[0])
+            a.append(n)
             d = datetime(2018,11,1,0,0) + timedelta(0,10*60*n)
             dp = d - timedelta(0,10*60)
             rf_fp = "/home/lar116/project/pablo/rainfields_data/310_{}_{}.prcp-c10.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
@@ -103,10 +105,10 @@ class DataGenerator(Sequence):
 def get_unet():
     concat_axis = 3
     #inputs = layers.Input(shape = (256, 256, 2))
-    #inputs = layers.Input(shape = (1024, 1024, 2))
+    #inputs = layers.Input(shape = (1024, 1024, 4))
     inputs = layers.Input(shape = (2048,2048,4))
 
-    feats = 16
+    feats = 8
     bn0 = BatchNormalization(axis=3)(inputs)
     conv1 = layers.Conv2D(feats, (3, 3), activation='relu', padding='same', name='conv1_1')(bn0)
     bn1 = BatchNormalization(axis=3)(conv1)
@@ -186,18 +188,18 @@ def get_unet():
 
     return model
 
-training_gen = DataGenerator(batch_size=4, length=800)
-validation_gen = DataGenerator(batch_size=4, length=200)
+training_gen = DataGenerator(batch_size=8, length=1600)
+validation_gen = DataGenerator(batch_size=8, length=800)
 
 model = get_unet()
-print(get_model_memory_usage(2, model), "GBs")
+print(get_model_memory_usage(8, model), "GBs")
 parallel_model = multi_gpu_model(model, gpus=4)
 sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 parallel_model.compile(loss=mse_holes, optimizer=sgd)
 
 #history = model.fit(x_train, y_train, epochs=50, batch_size=4, validation_data=(x_test, y_test))
 #history = model.fit_generator(generator=training_gen, validation_data=validation_gen, use_multiprocessing=True, workers=2)
-history = parallel_model.fit_generator(generator=training_gen, validation_data=validation_gen, epochs=100, max_queue_size=4, use_multiprocessing=True, workers=4)
+history = parallel_model.fit_generator(generator=training_gen, validation_data=validation_gen, epochs=100, max_queue_size=8, use_multiprocessing=True, workers=8)
 with open('train_history_him8_4batch.pkl', 'wb') as f:
     pickle.dump(history.history, f)
 
