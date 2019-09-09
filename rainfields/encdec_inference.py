@@ -83,37 +83,34 @@ def mse_holes(y_true, y_pred):
 
 model = load_model('rainfields_model.h5', custom_objects={'mse_holes': mse_holes})
 
-
 d = datetime(2018,11,1,10,0)
 i = 0
 for index in range(6*24*6):
     print(index, d)
     dp = d - timedelta(0,10*60)
-    crr_fp = "/data/pluvi_pondus/crr/{}00-P1S-ABOM_CRR-PRJ_AEA132_2000-HIMAWARI8-AHI.nc".format(d.strftime("%Y%m%d%H%M"))
-    rf_fp = "/data/pluvi_pondus/Rainfields/{}/310_{}_{}00.prcp-c10.npy".format(int(d.strftime("%d")), d.strftime("%Y%m%d"), d.strftime("%H%M"))
-    b8_fp = "/data/pluvi_pondus/HIM8_AU_{}_B8_{}.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
-    b14_fp = "/data/pluvi_pondus/HIM8_AU_{}_B14_{}.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
-    b8p_fp = "/data/pluvi_pondus/HIM8_AU_{}_B8_{}.npy".format(dp.strftime("%Y%m%d"), dp.strftime("%H%M%S"))
-    b14p_fp = "/data/pluvi_pondus/HIM8_AU_{}_B14_{}.npy".format(dp.strftime("%Y%m%d"), dp.strftime("%H%M%S"))
+    rf_fp = "/home/lar116/project/pablo/rainfields_data/310_{}_{}.prcp-c10.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
+    h8_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(d.strftime("%Y%m%d"))
+    h8p_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(dp.strftime("%Y%m%d"))
             
-    if not os.path.exists(rf_fp) or not os.path.exists(b8_fp) or not os.path.exists(b8p_fp) or not os.path.exists(crr_fp):
-        d += timedelta(0,10*60)
-        continue      
+    if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
+        continue
+           
+    h8_ds = xr.open_dataset(h8_fp)
+    h8p_ds = xr.open_dataset(h8p_fp)
+            
+    if np.datetime64(d) not in h8_ds.time.data or np.datetime64(dp) not in h8p_ds.time.data:
+        continue
+            
+    b8 = xr.open_dataset(h8_fp).B8.sel(time=d)[2:, 402:].data
+    b14 = xr.open_dataset(h8_fp).B14.sel(time=d)[2:, 402:].data
+    b8p = xr.open_dataset(h8p_fp).B8.sel(time=dp)[2:, 402:].data
+    b14p = xr.open_dataset(h8p_fp).B14.sel(time=dp)[2:, 402:].data
+    prec = np.load(rf_fp)[2:, 402:]
 
-    b8 = np.load(b8_fp)[2::2, 402::2]
-    b14 = np.load(b14_fp)[2::2, 402::2]
-    b8p = np.load(b8p_fp)[2::2, 402::2]
-    b14p = np.load(b14p_fp)[2::2, 402::2]
-            
-    prec = np.load(rf_fp)[2::2, 402::2]
     print("Rainfieds: ", np.nanmax(prec))
    
-    with xr.open_dataset(crr_fp) as ds:
-        crr = ds.precipitation_flux.data[0, 2::2, 402::2]
-        print("CRR: ", np.nanmax(crr))
-        plt.imsave("crr_{:03d}.png".format(i), np.clip(crr,0,10), vmin=0, vmax=10, cmap=newcmp)
-
     x = np.stack((b8p,b14p,b8,b14), axis=-1)
+    
     #imageio.imwrite("h8_b8_{:03d}.png".format(i), x[:,:,0])
     plt.imsave("h8_b8_{:03d}.png".format(i), x[:,:,0], cmap='gray')
     #imageio.imwrite("rainfields_{:03d}.png".format(i), np.clip(prec, 0, 5)/5)
@@ -122,7 +119,7 @@ for index in range(6*24*6):
     out = model.predict(x[None,:,:,:])
     print("NN: ", out.max())
     #imageio.imwrite("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0], 0, 3)/3)
-    plt.imsave("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0],0,10), vmin=0, vmax=10, cmap=newcmp)
+    plt.imsave("forecast_{:03d}.png".format(i), np.clip(out[0,:,:,0],0,10), vmin=0, vmax=10, cmap=newcmp)
     d += timedelta(0,10*60)
     i+=1
 

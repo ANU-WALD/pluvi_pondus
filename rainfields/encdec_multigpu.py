@@ -72,9 +72,6 @@ class DataGenerator(Sequence):
             
             if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
                 continue
-            
-            if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
-                continue
            
             h8_ds = xr.open_dataset(h8_fp)
             h8p_ds = xr.open_dataset(h8p_fp)
