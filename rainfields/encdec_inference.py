@@ -103,25 +103,37 @@ for index in range(6*24*6):
         d += timedelta(0,10*60)
         continue
             
-    b8 = xr.open_dataset(h8_fp).B8.sel(time=d)[2:, 402:].data
-    b14 = xr.open_dataset(h8_fp).B14.sel(time=d)[2:, 402:].data
-    b8p = xr.open_dataset(h8p_fp).B8.sel(time=dp)[2:, 402:].data
-    b14p = xr.open_dataset(h8p_fp).B14.sel(time=dp)[2:, 402:].data
+    b8 = h8_ds.B8.sel(time=d).data
+    b14 = h8_ds.B14.sel(time=d).data
+    b8p = h8p_ds.B8.sel(time=dp).data
+    b14p =h8p_ds.B14.sel(time=dp).data
+
+    h8_ds.close()
+    h8p_ds.close()
+    
     prec = np.load(rf_fp)[2:, 402:]
 
     print("Rainfieds: ", np.nanmax(prec))
    
     x = np.stack((b8p,b14p,b8,b14), axis=-1)
-    
+    print(x.shape) 
+    print(x[2:,402:,:].shape) 
+    print(x[:-2,:-402,:].shape) 
     #imageio.imwrite("h8_b8_{:03d}.png".format(i), x[:,:,0])
-    plt.imsave("h8_b8_{:03d}.png".format(i), x[:,:,0], cmap='gray')
+    #plt.imsave("h8_b8_{:03d}.png".format(i), x[2:,402:,0], cmap='gray')
     #imageio.imwrite("rainfields_{:03d}.png".format(i), np.clip(prec, 0, 5)/5)
     plt.imsave("rainfields_{:03d}.png".format(i), np.clip(prec,0,10), vmin=0, vmax=10, cmap=newcmp)
 
-    out = model.predict(x[None,:,:,:])
+    out = model.predict(x[None,2:,402:,:])
     print("NN: ", out.max())
     #imageio.imwrite("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0], 0, 3)/3)
-    plt.imsave("forecast_{:03d}.png".format(i), np.clip(out[0,:,:,0],0,10), vmin=0, vmax=10, cmap=newcmp)
+    plt.imsave("forecast_orig_{:03d}.png".format(i), np.clip(out[0,:,:,0],0,10), vmin=0, vmax=10, cmap=newcmp)
+    
+    out = model.predict(x[None,:-2,:-402,:])
+    print("NN: ", out.max())
+    #imageio.imwrite("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0], 0, 3)/3)
+    plt.imsave("forecast_shift_orig{:03d}.png".format(i), np.clip(out[0,:,:,0],0,10), vmin=0, vmax=10, cmap=newcmp)
+
     d += timedelta(0,10*60)
     i+=1
 
