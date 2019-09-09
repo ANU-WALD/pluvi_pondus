@@ -83,7 +83,7 @@ def mse_holes(y_true, y_pred):
 
 model = load_model('rainfields_model.h5', custom_objects={'mse_holes': mse_holes})
 
-d = datetime(2018,11,1,10,0)
+d = datetime(2018,11,1,0,10)
 i = 0
 for index in range(6*24*6):
     print(index, d)
@@ -93,12 +93,14 @@ for index in range(6*24*6):
     h8p_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(dp.strftime("%Y%m%d"))
             
     if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
+        d += timedelta(0,10*60)
         continue
            
     h8_ds = xr.open_dataset(h8_fp)
     h8p_ds = xr.open_dataset(h8p_fp)
             
     if np.datetime64(d) not in h8_ds.time.data or np.datetime64(dp) not in h8p_ds.time.data:
+        d += timedelta(0,10*60)
         continue
             
     b8 = xr.open_dataset(h8_fp).B8.sel(time=d)[2:, 402:].data
