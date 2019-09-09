@@ -28,8 +28,7 @@ def get_himfields(model, d):
     h8p_ds = xr.open_dataset(h8p_fp)
 
     if np.datetime64(d) not in h8_ds.time.data or np.datetime64(dp) not in h8p_ds.time.data:
-        d += timedelta(0,10*60)
-        continue
+        return arr
             
     b8 = h8_ds.B8.sel(time=d).data
     b14 = h8_ds.B14.sel(time=d).data
@@ -41,11 +40,32 @@ def get_himfields(model, d):
     
     x = np.stack((b8p,b14p,b8,b14), axis=-1)
 
-    arr[2:,402:] = model.predict(x[None,2:,402:,:])
-    arr[:-2,:-402] = model.predict(x[None,:-2,:-402,:])
+    arr[:-2,:-402] = model.predict(x[None,:-2,:-402,:])[:,:,0]
+    arr[2:,402:] = model.predict(x[None,2:,402:,:])[:,:,0]
 
     return arr
 
 
+ns = 1e-9 # number of seconds in a nanosecond
 model = load_model('rainfields_model.h5', custom_objects={'mse_holes': mse_holes})
 
+start = datetime(2018, 11, 1)
+while start <= datetime(2018, 12, 31):
+    print (start.strftime("%Y-%m-%d"))
+
+    ds = xr.open_dataset("/data/pluvi_pondus/2B/HIM8_2B_AU_{}.nc".format(start.strftime("%Y%m%d")))
+    ds0 = ds.copy(deep=True)
+    ds.close()
+
+    arr = np.zeros((ds0.time.data.shape[0], 2050, 2450), dtype=np.float32)
+    ds0 = ds0.drop(["B8","B14"])
+
+    for i, d in enumerate(ds0.time.data):
+        dt = datetime.utcfromtimestamp(d.astype(int) * ns)
+        print(i, d, dt)
+        arr[i,:,:] = get_himfields(model, dt)
+    
+    ds0['himfields'] = (('time', 'y', 'x'), arr)
+    ds0.to_netcdf("/data/pluvi_pondus/Himfields_{}.nc".format(start.strftime("%Y%m%d")))
+    ds0.close()
+    start += timedelta(days=1)
