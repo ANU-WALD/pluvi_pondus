@@ -39,11 +39,13 @@ def get_himfields(model, d):
     h8p_ds.close()
     
     x = np.stack((b8p,b14p,b8,b14), axis=-1)
-
-    arr[:-2,:-402] = model.predict(x[None,:-2,:-402,:])[:,:,0]
-    arr[2:,402:] = model.predict(x[None,2:,402:,:])[:,:,0]
-
-    return arr
+    print(x.shape, x.min(), x.max(), x[0,0,0]) 
+    
+    arr[:-2,:-402] = model.predict(x[None,:-2,:-402,:])[0,:,:,0]
+    arr[2:,402:] = model.predict(x[None,2:,402:,:])[0,:,:,0]
+    print(arr.max())
+    
+    return np.clip(arr, 0, None)
 
 
 ns = 1e-9 # number of seconds in a nanosecond
@@ -64,6 +66,7 @@ while start <= datetime(2018, 12, 31):
         dt = datetime.utcfromtimestamp(d.astype(int) * ns)
         print(i, d, dt)
         arr[i,:,:] = get_himfields(model, dt)
+        print("--", arr.max())
     
     ds0['himfields'] = (('time', 'y', 'x'), arr)
     ds0.to_netcdf("/data/pluvi_pondus/Himfields_{}.nc".format(start.strftime("%Y%m%d")))

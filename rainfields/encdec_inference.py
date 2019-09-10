@@ -88,10 +88,13 @@ i = 0
 for index in range(6*24*6):
     print(index, d)
     dp = d - timedelta(0,10*60)
-    rf_fp = "/home/lar116/project/pablo/rainfields_data/310_{}_{}.prcp-c10.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
-    h8_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(d.strftime("%Y%m%d"))
-    h8p_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(dp.strftime("%Y%m%d"))
-            
+    rf_fp = "/data/pluvi_pondus/Rainfields/{}/310_{}_{}.prcp-c10.npy".format(d.day, d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
+    h8_fp = "/data/pluvi_pondus/2B/HIM8_2B_AU_{}.nc".format(d.strftime("%Y%m%d"))
+    h8p_fp = "/data/pluvi_pondus/2B/HIM8_2B_AU_{}.nc".format(dp.strftime("%Y%m%d"))
+
+    print(rf_fp)
+    print(h8_fp)
+
     if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
         d += timedelta(0,10*60)
         continue
@@ -116,7 +119,7 @@ for index in range(6*24*6):
     print("Rainfieds: ", np.nanmax(prec))
    
     x = np.stack((b8p,b14p,b8,b14), axis=-1)
-    print(x.shape) 
+    print(x.shape, x.min(), x.max(), x[0,0,0]) 
     print(x[2:,402:,:].shape) 
     print(x[:-2,:-402,:].shape) 
     #imageio.imwrite("h8_b8_{:03d}.png".format(i), x[:,:,0])
@@ -126,6 +129,7 @@ for index in range(6*24*6):
 
     out = model.predict(x[None,2:,402:,:])
     print("NN: ", out.max())
+    exit()
     #imageio.imwrite("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0], 0, 3)/3)
     plt.imsave("forecast_orig_{:03d}.png".format(i), np.clip(out[0,:,:,0],0,10), vmin=0, vmax=10, cmap=newcmp)
     
