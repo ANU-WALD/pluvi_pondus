@@ -14,6 +14,13 @@ def mse_holes(y_true, y_pred):
 
     return K.mean(K.square(y_true-y_pred), axis=-1)
 
+def mae_holes(y_true, y_pred):
+    idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
+    y_true = K.tf.gather_nd(y_true, idxs)
+    y_pred = K.tf.gather_nd(y_pred, idxs)
+
+    return K.mean(K.abs(y_true-y_pred), axis=-1)
+
 def get_himfields(model, d):
     arr = np.zeros((2050, 2450), dtype=np.float32)
 
@@ -49,7 +56,7 @@ def get_himfields(model, d):
 
 
 ns = 1e-9 # number of seconds in a nanosecond
-model = load_model('rainfields_model.h5', custom_objects={'mse_holes': mse_holes})
+model = load_model('rainfields_model_mae.h5', custom_objects={'mae_holes': mae_holes})
 
 start = datetime(2018, 11, 1)
 while start <= datetime(2018, 12, 31):
@@ -69,6 +76,6 @@ while start <= datetime(2018, 12, 31):
         print("--", arr.max())
     
     ds0['himfields'] = (('time', 'y', 'x'), arr)
-    ds0.to_netcdf("/data/pluvi_pondus/Himfields_{}.nc".format(start.strftime("%Y%m%d")))
+    ds0.to_netcdf("/data/pluvi_pondus/Himfields_mae_{}.nc".format(start.strftime("%Y%m%d")))
     ds0.close()
     start += timedelta(days=1)
