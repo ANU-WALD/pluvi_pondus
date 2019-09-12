@@ -31,7 +31,6 @@ class Pix2Pix():
 
         # Number of filters in the first layer of G and D
         self.gf = 64
-        self.df = 64
 
         optimizer = Adam(0.0002, 0.5, decay=0.0002/400)
 
@@ -39,9 +38,7 @@ class Pix2Pix():
         self.discriminator = self.build_discriminator()
         print(self.discriminator.summary())
 
-        self.discriminator.compile(loss='mse',
-            optimizer=optimizer,
-            metrics=['accuracy'])
+        self.discriminator.compile(loss='mse', optimizer=optimizer, metrics=['accuracy'])
 
         #-------------------------
         # Construct Computational
@@ -70,72 +67,69 @@ class Pix2Pix():
         valid = self.discriminator([fake_A, img_B])
 
         self.combined = Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
-        self.combined.compile(loss=['mse', 'mae'],
-                              loss_weights=[1, 100],
-                              optimizer=optimizer)
+        self.combined.compile(loss=['mse', 'mae'], loss_weights=[1, 100], optimizer=optimizer)
 
 
-    def build_generator(self):
-        """U-Net Generator"""
-    
-        def conv2d(layer_input, filters, strides, f_size=4):
-            """Layers used during downsampling"""
-            e = BatchNormalization()(layer_input)
-            return Conv2D(filters, kernel_size=f_size, strides=strides, padding='same', activation='relu')(e)
+def generator_model(img_height=1024, img_width=1024, channels=4, gf=32):
+    """U-Net Generator"""
+ 
+    def conv2d(layer_input, filters, strides, f_size=4):
+        """Layers used during downsampling"""
+        e = BatchNormalization()(layer_input)
+        return Conv2D(filters, kernel_size=f_size, strides=strides, padding='same', activation='relu')(e)
 
-        def deconv2d(layer_input, skip_input, filters, strides, f_size=4):
-            """Layers used during upsampling"""
-            d = BatchNormalization()(layer_input)
-            d = UpSampling2D(size=strides)(d)
-            d = Conv2D(filters, kernel_size=f_size, strides=1, padding='same', activation='relu')(d)
-            d = Concatenate()([d, skip_input])
-            return d
+    def deconv2d(layer_input, skip_input, filters, strides, f_size=4):
+        """Layers used during upsampling"""
+        d = BatchNormalization()(layer_input)
+        d = UpSampling2D(size=strides)(d)
+        d = Conv2D(filters, kernel_size=f_size, strides=1, padding='same', activation='relu')(d)
+        d = Concatenate()([d, skip_input])
+        return d
 
-        n_filters = 32
-        # Image input
-        d0 = Input(shape=(240,360,3))
+    # Image input
+    d0 = Input(shape=(img_height, img_width, channels))
 
-        # Downsampling
-        d1 = conv2d(d0, n_filters, strides=2)
-        d2 = conv2d(d1, n_filters*2, strides=3)
-        d3 = conv2d(d2, n_filters*4, strides=2)
-        d4 = conv2d(d3, n_filters*8, strides=2)
-        #d5 = conv2d(d4, n_filters*8, strides=2)
+    # Downsampling
+    d1 = conv2d(d0, gf, strides=2)
+    d2 = conv2d(d1, gf*2, strides=2)
+    d3 = conv2d(d2, gf*4, strides=2)
+    d4 = conv2d(d3, gf*8, strides=2)
+    d5 = conv2d(d4, gf*8, strides=2)
 
-        # Upsampling
-        #u1 = deconv2d(d5, d4, n_filters*8, strides=2)
-        u2 = deconv2d(d4, d3, n_filters*4, strides=2)
-        u3 = deconv2d(u2, d2, n_filters*2, strides=2)
-        u4 = deconv2d(u3, d1, n_filters, strides=3)
-
-        u5 = UpSampling2D(size=2)(u4)
-        output_img = Conv2D(1, kernel_size=1, strides=1, padding='same', activation='relu')(u5)
-
-        return Model(inputs=d0, outputs=output_img)
-
-
-    def build_discriminator(self):
-
-        def d_layer(layer_input, filters, strides, f_size=4, bn=True):
-            """Discriminator layer"""
-            d = BatchNormalization()(layer_input)
-            d = Conv2D(filters, strides=strides, kernel_size=f_size, padding='same')(d)
-            return LeakyReLU(alpha=0.2)(d)
-
-        img_A = Input(shape=self.imgA_shape)
-        img_B = Input(shape=self.imgB_shape)
-
-        # Concatenate image and conditioning image by channels to produce input
-        combined_imgs = Concatenate(axis=-1)([img_A, img_B])
-
-        d1 = d_layer(combined_imgs, self.df, 2)
-        d2 = d_layer(d1, self.df*2, 3)
-        d3 = d_layer(d2, self.df*4, 2)
-        d4 = d_layer(d3, self.df*8, 2)
-
-        validity = Conv2D(1, strides=1, kernel_size=4, padding='same')(d4)
+    # Upsampling
+    u1 = deconv2d(d5, d4, gf*8, strides=2)
+    u2 = deconv2d(d4, d3, gf*4, strides=2)
+    u3 = deconv2d(u2, d2, gf*2, strides=2)
+    u4 = deconv2d(u3, d1, gf, strides=2)
+    u5 = UpSampling2D(size=2)(u4)
         
-        return Model([img_A, img_B], validity)
+    output_img = Conv2D(1, kernel_size=1, strides=1, padding='same', activation='relu')(u5)
+
+    return Model(inputs=d0, outputs=output_img)
+
+
+def discriminator_model(img_height=1024, img_width=1024, channels=4, df=32):
+
+    def d_layer(layer_input, filters, strides, f_size=4):
+        """Discriminator layer"""
+        d = BatchNormalization()(layer_input)
+        d = Conv2D(filters, strides=strides, kernel_size=f_size, padding='same')(d)
+        return LeakyReLU(alpha=0.2)(d)
+
+    img_A = Input(shape=self.imgA_shape)
+    img_B = Input(shape=self.imgB_shape)
+
+    # Concatenate image and conditioning image by channels to produce input
+    combined_imgs = Concatenate(axis=-1)([img_A, img_B])
+
+    d1 = d_layer(combined_imgs, self.df, 2)
+    d2 = d_layer(d1, df*2, 2)
+    d3 = d_layer(d2, df*4, 2)
+    d4 = d_layer(d3, df*8, 2)
+
+    validity = Conv2D(1, strides=1, kernel_size=4, padding='same')(d4)
+        
+    return Model([img_A, img_B], validity)
 
 
     def train(self, epochs, batch_size=1, sample_interval=50):
