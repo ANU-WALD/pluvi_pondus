@@ -183,7 +183,7 @@ def get_unet():
     conv9 = layers.Conv2D(feats, (3, 3), activation='relu', padding='same')(bn17)
     bn18 = BatchNormalization(axis=3)(conv9)
 
-    conv10 = layers.Conv2D(1, (1, 1))(bn18)
+    conv10 = layers.Conv2D(1, (1, 1), activation='relu')(bn18)
     #bn19 = BatchNormalization(axis=3)(conv10)
 
     model = models.Model(inputs=inputs, outputs=conv10)
@@ -199,12 +199,12 @@ model = get_unet()
 print(get_model_memory_usage(8, model), "GBs")
 parallel_model = multi_gpu_model(model, gpus=4)
 sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-parallel_model.compile(loss=mae_holes, optimizer=sgd)
+parallel_model.compile(loss=mse_holes, optimizer=sgd)
 
 #history = model.fit(x_train, y_train, epochs=50, batch_size=4, validation_data=(x_test, y_test))
 #history = model.fit_generator(generator=training_gen, validation_data=validation_gen, use_multiprocessing=True, workers=2)
 history = parallel_model.fit_generator(generator=training_gen, validation_data=validation_gen, epochs=100, max_queue_size=8, use_multiprocessing=True, workers=8)
-with open('train_history_him8_4batch.pkl', 'wb') as f:
+with open('train_history_him8_8batch.pkl', 'wb') as f:
     pickle.dump(history.history, f)
 
-parallel_model.save('rainfields_model.h5')
+parallel_model.save('rainfields_model_mse_const0.h5')
