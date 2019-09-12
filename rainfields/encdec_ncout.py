@@ -25,8 +25,8 @@ def get_himfields(model, d):
     arr = np.zeros((2050, 2450), dtype=np.float32)
 
     dp = d - timedelta(0, 10*60)
-    h8_fp = "/data/pluvi_pondus/2B/HIM8_2B_AU_{}.nc".format(d.strftime("%Y%m%d"))
-    h8p_fp = "/data/pluvi_pondus/2B/HIM8_2B_AU_{}.nc".format(dp.strftime("%Y%m%d"))
+    h8_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(d.strftime("%Y%m%d"))
+    h8p_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(dp.strftime("%Y%m%d"))
 
     if not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
         return arr
@@ -58,11 +58,11 @@ def get_himfields(model, d):
 ns = 1e-9 # number of seconds in a nanosecond
 model = load_model('rainfields_model_mae.h5', custom_objects={'mae_holes': mae_holes})
 
-start = datetime(2018, 11, 1)
-while start <= datetime(2018, 12, 31):
+start = datetime(2018, 11, 2)
+while start <= datetime(2018, 11, 2):
     print (start.strftime("%Y-%m-%d"))
 
-    ds = xr.open_dataset("/data/pluvi_pondus/2B/HIM8_2B_AU_{}.nc".format(start.strftime("%Y%m%d")))
+    ds = xr.open_dataset("/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(start.strftime("%Y%m%d")))
     ds0 = ds.copy(deep=True)
     ds.close()
 
@@ -74,8 +74,10 @@ while start <= datetime(2018, 12, 31):
         print(i, d, dt)
         arr[i,:,:] = get_himfields(model, dt)
         print("--", arr.max())
-    
+   
+    np.save("arr.npy", arr)
+    exit() 
     ds0['himfields'] = (('time', 'y', 'x'), arr)
-    ds0.to_netcdf("/data/pluvi_pondus/Himfields_mae_{}.nc".format(start.strftime("%Y%m%d")))
+    ds0.to_netcdf("Himfields_mae_{}.nc".format(start.strftime("%Y%m%d")))
     ds0.close()
     start += timedelta(days=1)

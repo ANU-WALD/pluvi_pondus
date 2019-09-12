@@ -46,6 +46,13 @@ def mse_holes(y_true, y_pred):
 
     return K.mean(K.square(y_true-y_pred), axis=-1)
 
+def mae_holes(y_true, y_pred):
+    idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
+    y_true = K.tf.gather_nd(y_true, idxs)
+    y_pred = K.tf.gather_nd(y_pred, idxs)
+
+    return K.mean(K.abs(y_true-y_pred), axis=-1)
+
 class DataGenerator(Sequence):
     def __init__(self, batch_size=4, length=40):
         'Initialization'
@@ -192,7 +199,7 @@ model = get_unet()
 print(get_model_memory_usage(8, model), "GBs")
 parallel_model = multi_gpu_model(model, gpus=4)
 sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-parallel_model.compile(loss=mse_holes, optimizer=sgd)
+parallel_model.compile(loss=mae_holes, optimizer=sgd)
 
 #history = model.fit(x_train, y_train, epochs=50, batch_size=4, validation_data=(x_test, y_test))
 #history = model.fit_generator(generator=training_gen, validation_data=validation_gen, use_multiprocessing=True, workers=2)
