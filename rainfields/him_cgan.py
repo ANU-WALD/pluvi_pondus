@@ -6,68 +6,65 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
+from keras.utils import Sequence
 import datetime
 from data_loader3 import DataLoader
 import numpy as np
 import os
 import prec_verif
 import sys
+import xarray as xr
 
-class Pix2Pix():
-    def __init__(self):
-        # Input shape
-        self.img_rows = 240
-        self.img_cols = 360
-        self.channels = 3
-        self.imgA_shape = (self.img_rows, self.img_cols, 1)
-        self.imgB_shape = (self.img_rows, self.img_cols, 3)
+class DataGenerator(Sequence):
+    def __init__(self, batch_size=4, length=40):
+        'Initialization'
+        self.batch_size = batch_size
+        self.length = length
 
-        # Configure data loader
-        self.dataset_name = 'gan_era5'
-        self.data_loader = DataLoader()
+    def __len__(self):
+        return int(self.length/self.batch_size)
 
-        # Calculate output shape of D (PatchGAN)
-        self.disc_patch = (10, 15, 1)
+    def __getitem__(self, index):
+        x = []
+        y = []
 
-        # Number of filters in the first layer of G and D
-        self.gf = 64
+        a = []
+        while len(y) < self.batch_size:
+            np.random.seed()
+            n = int(np.random.randint(1,6*24*6,size=1)[0])
+            a.append(n)
+            d = datetime(2018,11,1,0,0) + timedelta(0,10*60*n)
+            dp = d - timedelta(0,10*60)
+            rf_fp = "/home/lar116/project/pablo/rainfields_data/310_{}_{}.prcp-c10.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
+            h8_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(d.strftime("%Y%m%d"))
+            h8p_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(dp.strftime("%Y%m%d"))
+            
+            if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
+                continue
+           
+            h8_ds = xr.open_dataset(h8_fp)
+            h8p_ds = xr.open_dataset(h8p_fp)
 
-        optimizer = Adam(0.0002, 0.5, decay=0.0002/400)
+           
+            if np.datetime64(d) not in h8_ds.time.data or np.datetime64(dp) not in h8p_ds.time.data:
+                continue
+            
+            b8 = xr.open_dataset(h8_fp).B8.sel(time=d)[2::2, 402::2].data
+            b14 = xr.open_dataset(h8_fp).B14.sel(time=d)[2::2, 402::2].data
+            b8p = xr.open_dataset(h8p_fp).B8.sel(time=dp)[2::2, 402::2].data
+            b14p = xr.open_dataset(h8p_fp).B14.sel(time=dp)[2::2, 402::2].data
+            prec = np.load(rf_fp)[2::2, 402::2]
 
-        # Build and compile the discriminator
-        self.discriminator = self.build_discriminator()
-        print(self.discriminator.summary())
+            x.append(np.stack((b8p,b14p,b8,b14), axis=-1))
+            y.append(prec)
 
-        self.discriminator.compile(loss='mse', optimizer=optimizer, metrics=['accuracy'])
+        x = np.stack(x, axis=0)
+        y = np.stack(y, axis=0)[:,:,:,None]
 
-        #-------------------------
-        # Construct Computational
-        #   Graph of Generator
-        #-------------------------
+        return y, x
 
-        # Build the generator
-        self.generator = self.build_generator()
-        print(self.generator.summary())
-
-        # Input images and their conditioning images
-        img_A = Input(shape=self.imgA_shape)
-        img_B = Input(shape=self.imgB_shape)
-        print(img_A.shape, img_B.shape)
-        print("_______________")
-
-        # By conditioning on B generate a fake version of A
-        fake_A = self.generator(img_B)
-        print(fake_A.shape)
-        print("_______________")
-
-        # For the combined model we will only train the generator
-        self.discriminator.trainable = False
-
-        # Discriminators determines validity of translated images / condition pairs
-        valid = self.discriminator([fake_A, img_B])
-
-        self.combined = Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
-        self.combined.compile(loss=['mse', 'mae'], loss_weights=[1, 100], optimizer=optimizer)
+    def on_epoch_end(self):
+        pass
 
 
 def generator_model(img_height=1024, img_width=1024, channels=4, gf=32):
@@ -131,78 +128,114 @@ def discriminator_model(img_height=1024, img_width=1024, channels=4, df=32):
         
     return Model([img_A, img_B], validity)
 
-
-    def train(self, epochs, batch_size=1, sample_interval=50):
-
-        start_time = datetime.datetime.now()
-
-        # Adversarial loss ground truths
-        valid = np.ones((batch_size,) + self.disc_patch)
-        fake = np.zeros((batch_size,) + self.disc_patch)
-
-        for epoch in range(epochs):
-            for batch_i, (imgs_A, imgs_B) in enumerate(self.data_loader.load_batch(batch_size)):
-
-                # ---------------------
-                #  Train Discriminator
-                # ---------------------
-
-                # Condition on B and generate a translated version
-                fake_A = self.generator.predict(imgs_B)
-
-                # Train the discriminators (original images = real / generated = Fake)
-                d_loss_real = self.discriminator.train_on_batch([imgs_A, imgs_B], valid)
-                d_loss_fake = self.discriminator.train_on_batch([fake_A, imgs_B], fake)
-                d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
-
-                # -----------------
-                #  Train Generator
-                # -----------------
-
-                # Train the generators
-                g_loss = self.combined.train_on_batch([imgs_A, imgs_B], [valid, imgs_A])
-
-                elapsed_time = datetime.datetime.now() - start_time
-                # Plot the progress
-            print ("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch, epochs, d_loss[0], 100*d_loss[1], g_loss[0], elapsed_time))
-
-                # If at save interval => save generated image samples
-                #if batch_i % sample_interval == 0:
-            self.sample_images(epoch, batch_i)
-            #self.verif_metrics(epoch, epochs, batch_i)
-
-
-    def sample_images(self, epoch, batch_i):
-        os.makedirs('images/%s' % self.dataset_name, exist_ok=True)
-        r, c = 3, 3
+"""
+def sample_images(epoch, batch_i):
+    os.makedirs('images/%s' % self.dataset_name, exist_ok=True)
+    r, c = 3, 3
         
-        imgs_A, imgs_B = self.data_loader.load_data(batch_size=200, is_testing=True)
-        fake_A = self.generator.predict(imgs_B)
-        print("Test MSE: {} MAE: {}".format(np.mean(np.square(imgs_A - fake_A)), np.mean(np.abs(imgs_A - fake_A))))
+    imgs_A, imgs_B = self.data_loader.load_data(batch_size=200, is_testing=True)
+    fake_A = self.generator.predict(imgs_B)
+    print("Test MSE: {} MAE: {}".format(np.mean(np.square(imgs_A - fake_A)), np.mean(np.abs(imgs_A - fake_A))))
 
-        imgs_A, imgs_B = self.data_loader.load_data(batch_size=3, is_testing=True)
-        fake_A = self.generator.predict(imgs_B)
+    imgs_A, imgs_B = self.data_loader.load_data(batch_size=3, is_testing=True)
+    fake_A = self.generator.predict(imgs_B)
 
-        gen_imgs = np.concatenate([imgs_B[:,:,:,0], fake_A[:,:,:,0], imgs_A[:,:,:,0]])
-
-
-        titles = ['Input', 'Generated', 'Original']
-        fig, axs = plt.subplots(r, c)
-        cnt = 0
-        for i in range(r):
-            for j in range(c):
-                if i == 0:
-                    axs[i,j].imshow(gen_imgs[cnt])
-                else:
-                    axs[i,j].imshow(np.log(1+gen_imgs[cnt]), vmin=0, vmax=np.log(21), cmap=raincmp)
-
-                axs[i,j].set_title(titles[i])
-                axs[i,j].axis('off')
-                cnt += 1
-        fig.savefig("images/%s/%d_%d.png" % (self.dataset_name, epoch, batch_i))
-        plt.close()
+    gen_imgs = np.concatenate([imgs_B[:,:,:,0], fake_A[:,:,:,0], imgs_A[:,:,:,0]])
 
 
-if __name__ == '__main__':
-    gan = Pix2Pix()
-    gan.train(epochs=400, batch_size=10, sample_interval=200)
+    titles = ['Input', 'Generated', 'Original']
+    fig, axs = plt.subplots(r, c)
+    cnt = 0
+    for i in range(r):
+        for j in range(c):
+                axs[i,j].imshow(gen_imgs[cnt])
+
+            axs[i,j].set_title(titles[i])
+            axs[i,j].axis('off')
+            cnt += 1
+    fig.savefig("images/%s/%d_%d.png" % (self.dataset_name, epoch, batch_i))
+    plt.close()
+"""
+
+
+# Configure data loader
+data_loader = DataGenerator(batch_size=4, length=40)
+
+# Build and compile the discriminator
+discriminator = discriminator_model()
+print(discriminator.summary())
+optimizer = Adam(0.0002, 0.5, decay=0.0002/400)
+discriminator.compile(loss='mse', optimizer=optimizer, metrics=['accuracy'])
+
+#-------------------------
+# Construct Computational
+#   Graph of Generator
+#-------------------------
+
+# Build the generator
+generator = generator_model()
+print(generator.summary())
+
+# Input images and their conditioning images
+img_A = Input(shape=(1024,1024,1))
+img_B = Input(shape=(1024,1024,4))
+print(img_A.shape, img_B.shape)
+print("_______________")
+
+# By conditioning on B generate a fake version of A
+fake_A = generator(img_B)
+print(fake_A.shape)
+print("_______________")
+
+# For the combined model we will only train the generator
+#self.discriminator.trainable = False
+
+# Discriminators determines validity of translated images / condition pairs
+valid = discriminator([fake_A, img_B])
+
+combined = Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
+combined.compile(loss=['mse', 'mae'], loss_weights=[1, 100], optimizer=optimizer)
+
+
+
+epochs=400 
+batch_size=10 
+sample_interval=200
+# Calculate output shape of D (PatchGAN)
+disc_patch = (10, 15, 1)
+
+start_time = datetime.datetime.now()
+
+# Adversarial loss ground truths
+valid = np.ones((batch_size,) + self.disc_patch)
+fake = np.zeros((batch_size,) + self.disc_patch)
+
+for epoch in range(epochs):
+    for batch_i, (imgs_A, imgs_B) in enumerate(data_loader):
+        # ---------------------
+        #  Train Discriminator
+        # ---------------------
+
+        # Condition on B and generate a translated version
+        fake_A = generator.predict(imgs_B)
+
+        # Train the discriminators (original images = real / generated = Fake)
+        d_loss_real = discriminator.train_on_batch([imgs_A, imgs_B], valid)
+        d_loss_fake = discriminator.train_on_batch([fake_A, imgs_B], fake)
+        d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+
+        # -----------------
+        #  Train Generator
+        # -----------------
+
+        # Train the generators
+        g_loss = combined.train_on_batch([imgs_A, imgs_B], [valid, imgs_A])
+
+        elapsed_time = datetime.datetime.now() - start_time
+        # Plot the progress
+        print ("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch, epochs, d_loss[0], 100*d_loss[1], g_loss[0], elapsed_time))
+
+        # If at save interval => save generated image samples
+        #if batch_i % sample_interval == 0:
+        #sample_images(epoch, batch_i)
+        #self.verif_metrics(epoch, epochs, batch_i)
