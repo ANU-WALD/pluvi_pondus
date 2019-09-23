@@ -1,10 +1,19 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from keras import backend as K
 import tensorflow as tf
 
 import os
 import time
 import matplotlib.pyplot as plt
+
+def mae_holes(y_true, y_pred):
+    #idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
+    idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
+    y_true = tf.gather_nd(y_true, idxs)
+    y_pred = tf.gather_nd(y_pred, idxs)
+
+    return K.mean(K.abs(y_true-y_pred), axis=-1)
 
 _URL = 'https://people.eecs.berkeley.edu/~tinghuiz/projects/pix2pix/datasets/facades.tar.gz'
 
@@ -203,10 +212,15 @@ def Generator():
 def Discriminator():
   initializer = tf.random_normal_initializer(0., 0.02)
 
-  inp = tf.keras.layers.Input(shape=[None, None, 3], name='input_image')
   tar = tf.keras.layers.Input(shape=[None, None, 3], name='target_image')
+  #clean_tar = tf.where(tf.math.is_nan(tar), tf.zeros_like(tar), tar)
 
-  x = tf.keras.layers.concatenate([inp, tar]) # (bs, 256, 256, channels*2)
+  #idxs = tf.where(tf.math.is_nan(tar))
+  #print("AAAA", idxs)
+  inp = tf.keras.layers.Input(shape=[None, None, 3], name='input_image')
+  #tf.multiply(tar, tf.cast(mask, original_tensor.type()))
+
+  x = tf.keras.layers.concatenate([inp, tf.where(tf.math.is_nan(tar), tf.zeros_like(tar), tar)]) # (bs, 256, 256, channels*2)
 
   down1 = downsample(64, 4, False)(x) # (bs, 128, 128, 64)
   down2 = downsample(128, 4)(down1) # (bs, 64, 64, 128)
@@ -245,7 +259,8 @@ def generator_loss(disc_generated_output, gen_output, target):
   gan_loss = loss_object(tf.ones_like(disc_generated_output), disc_generated_output)
 
   # mean absolute error
-  l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
+  #l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
+  l1_loss = mae_holes(target, gen_output)
 
   total_gen_loss = gan_loss + (LAMBDA * l1_loss)
 
