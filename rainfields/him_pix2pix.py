@@ -281,13 +281,9 @@ def generate_images(model, test_input, tar, i=0):
   # the accumulated statistics learned from the training dataset
   # (which we don't want)
   prediction = model(test_input, training=True)
-  print(prediction[0])
-  print(tar[0])
-  print(np.count_nonzero(np.isnan(prediction[0])))
-  print(np.count_nonzero(np.isnan(tar[0])))
+  plt.imsave("pred_{:02d}.png".format(i), np.array(prediction[0] * 0.5 + 0.5)) 
+  plt.imsave("targ_{:02d}.png".format(i), np.array(tar[0] * 0.5 + 0.5)) 
   return  
-  plt.imsave("pred_{:02d}".format(i), prediction[0].astype(np.float32)) 
-  plt.imsave("targ_{:02d}".format(i), tar[0]) 
   plt.imsave("test_{:02d}".format(i), test_input[0]) 
   
   plt.figure(figsize=(15,15))
