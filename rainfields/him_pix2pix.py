@@ -38,10 +38,9 @@ def load(image_file):
   real_image = image[:, :w, :]
   input_image = image[:, w:, :]
 
+  input_image = tf.cast(input_image, tf.float32)
   patch = np.zeros((256, 256, 3), dtype=np.float32)
   patch[100:150, 150:200,:] = np.nan
-  input_image = tf.cast(input_image, tf.float32)
-  #input_image = tf.add(tf.cast(input_image, tf.float32), tf.constant(patch, dtype=np.float32))
   real_image = tf.add(tf.cast(real_image, tf.float32), tf.constant(patch, dtype=np.float32))
   #real_image = tf.cast(real_image, tf.float32)
 
@@ -62,14 +61,6 @@ def random_crop(input_image, real_image):
   return cropped_image[0], cropped_image[1]
 
 
-# normalizing the images to [-1, 1]
-def normalize(input_image, real_image):
-  input_image = (input_image / 127.5) - 1
-  real_image = (real_image / 127.5) - 1
-
-  return input_image, real_image
-
-
 #@tf.function()
 def random_jitter(input_image, real_image):
   # resizing to 286 x 286 x 3
@@ -88,11 +79,19 @@ def random_jitter(input_image, real_image):
 
   return input_image, real_image
 
+# normalizing the images to [-1, 1]
+def normalize(input_image, real_image):
+  input_image = (input_image / 127.5) - 1
+  real_image = (real_image / 127.5) - 1
+
+  return input_image, real_image
+
+
 
 #@tf.function()
 def load_image_train(image_file):
   input_image, real_image = load(image_file)
-  input_image, real_image = random_jitter(input_image, real_image)
+  #input_image, real_image = random_jitter(input_image, real_image)
   input_image, real_image = normalize(input_image, real_image)
 
   return input_image, real_image
@@ -100,7 +99,7 @@ def load_image_train(image_file):
 
 def load_image_test(image_file):
   input_image, real_image = load(image_file)
-  input_image, real_image = resize(input_image, real_image, IMG_HEIGHT, IMG_WIDTH)
+  #input_image, real_image = resize(input_image, real_image, IMG_HEIGHT, IMG_WIDTH)
   input_image, real_image = normalize(input_image, real_image)
 
   return input_image, real_image
@@ -207,6 +206,31 @@ def Generator():
   return tf.keras.Model(inputs=inputs, outputs=x)
 
 
+def Discriminator2():
+  initializer = tf.random_normal_initializer(0., 0.02)
+
+  inp = tf.keras.layers.Input(shape=[None, None, 3], name='input_image')
+  tar = tf.keras.layers.Input(shape=[None, None, 3], name='target_image')
+
+  #x = tf.keras.layers.concatenate([inp, tf.where(tf.math.is_nan(tar), tf.zeros_like(tar), tar)]) # (bs, 256, 256, channels*2)
+  #x = tf.keras.layers.concatenate([inp, tf.where(tf.math.is_nan(tar), tf.zeros_like(tar), tar)]) # (bs, 256, 256, channels*2)
+  #x = tf.keras.layers.concatenate([tf.cast(inp[:,:100,:100,:], dtype=tf.float32), tf.cast(tar[:,:100,:100,:], dtype=tf.float32)]) # (bs, 256, 256, channels*2)
+  x = tf.keras.layers.concatenate([inp, tar]) # (bs, 256, 256, channels*2)
+      
+  conv = tf.keras.layers.Conv2D(8, 5, strides=1, padding='same', activation='relu', kernel_initializer=initializer, use_bias=False)(x)
+  conv = tf.keras.layers.BatchNormalization()(conv)
+  conv = tf.keras.layers.Conv2D(16, 5, strides=1, padding='same', activation='relu', kernel_initializer=initializer)(conv)
+  conv = tf.keras.layers.BatchNormalization()(conv)
+  conv = tf.keras.layers.Conv2D(32, 5, strides=1, padding='same', activation='relu', kernel_initializer=initializer)(conv)
+  conv = tf.keras.layers.BatchNormalization()(conv)
+  conv = tf.keras.layers.Conv2D(64, 5, strides=1, padding='same', kernel_initializer=initializer, use_bias=False)(conv)
+  conv = tf.keras.layers.BatchNormalization()(conv)
+
+  leaky_relu = tf.keras.layers.LeakyReLU()(conv)
+
+  last = tf.keras.layers.Conv2D(1, 4, strides=1, padding='same', kernel_initializer=initializer)(leaky_relu) # (bs, 256, 256, 1)
+
+  return tf.keras.Model(inputs=[inp, tar], outputs=last)
 
 
 def Discriminator():
@@ -220,7 +244,8 @@ def Discriminator():
   inp = tf.keras.layers.Input(shape=[None, None, 3], name='input_image')
   #tf.multiply(tar, tf.cast(mask, original_tensor.type()))
 
-  x = tf.keras.layers.concatenate([inp, tf.where(tf.math.is_nan(tar), tf.zeros_like(tar), tar)]) # (bs, 256, 256, channels*2)
+  #x = tf.keras.layers.concatenate([inp, tf.where(tf.math.is_nan(tar), tf.zeros_like(tar), tar)]) # (bs, 256, 256, channels*2)
+  x = tf.keras.layers.concatenate([inp, tar]) # (bs, 256, 256, channels*2)
 
   down1 = downsample(64, 4, False)(x) # (bs, 128, 128, 64)
   down2 = downsample(128, 4)(down1) # (bs, 64, 64, 128)
@@ -247,8 +272,14 @@ LAMBDA = 100
 loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
 def discriminator_loss(disc_real_output, disc_generated_output):
+  #patch = np.ones((1, 256, 256, 1))
+  #patch[:,100:150,150:200,:] = 0
+  #patch = np.ones((1, 100, 100, 1))
+  #real_loss = loss_object(tf.cast(patch, tf.float32), disc_real_output[:,:100,:100,:])
   real_loss = loss_object(tf.ones_like(disc_real_output), disc_real_output)
-
+  
+  #patch = np.zeros((1, 100, 100, 1))
+  #generated_loss = loss_object(tf.cast(patch, tf.float32), disc_generated_output[:,:100,:100,:])
   generated_loss = loss_object(tf.zeros_like(disc_generated_output), disc_generated_output)
 
   total_disc_loss = real_loss + generated_loss
@@ -268,7 +299,7 @@ def generator_loss(disc_generated_output, gen_output, target):
 
 
 generator = Generator()
-discriminator = Discriminator()
+discriminator = Discriminator2()
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
@@ -301,8 +332,14 @@ def generate_images(model, test_input, tar, i=0):
 
 @tf.function
 def train_step(input_image, target):
+  target = tf.where(tf.math.is_nan(target), tf.zeros_like(target), target) # (bs, 256, 256, channels*2)
+
   with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
     gen_output = generator(input_image, training=True)
+    mask = np.ones((1,256,256,1))
+    mask[:,100:150, 150:200,:] = 0
+    mask = tf.cast(mask, dtype=tf.float32)
+    gen_output = tf.math.multiply(gen_output, mask)
 
     disc_real_output = discriminator([input_image, target], training=True)
     disc_generated_output = discriminator([input_image, gen_output], training=True)
@@ -319,7 +356,6 @@ def train_step(input_image, target):
                                           generator.trainable_variables))
   discriminator_optimizer.apply_gradients(zip(discriminator_gradients,
                                               discriminator.trainable_variables))
-
 
 checkpoint_dir = './training_checkpoints'
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
