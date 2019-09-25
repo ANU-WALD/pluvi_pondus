@@ -7,13 +7,13 @@ import os
 import time
 import matplotlib.pyplot as plt
 
-def mae_holes(y_true, y_pred):
+def mse_holes(y_true, y_pred):
     #idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
     idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
     y_true = tf.gather_nd(y_true, idxs)
     y_pred = tf.gather_nd(y_pred, idxs)
 
-    return K.mean(K.abs(y_true-y_pred), axis=-1)
+    return K.mean(K.square(y_true-y_pred), axis=-1)
 
 _URL = 'https://people.eecs.berkeley.edu/~tinghuiz/projects/pix2pix/datasets/facades.tar.gz'
 
@@ -46,7 +46,7 @@ def load(image_file):
 
   return input_image, real_image
 
-
+"""
 def resize(input_image, real_image, height, width):
   input_image = tf.image.resize(input_image, [height, width], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
   real_image = tf.image.resize(real_image, [height, width], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
@@ -60,7 +60,6 @@ def random_crop(input_image, real_image):
 
   return cropped_image[0], cropped_image[1]
 
-
 #@tf.function()
 def random_jitter(input_image, real_image):
   # resizing to 286 x 286 x 3
@@ -70,14 +69,13 @@ def random_jitter(input_image, real_image):
   input_image, real_image = random_crop(input_image, real_image)
 
   #tf.cond(tf.greater(x, 0), lambda: 1, lambda: 0)
-  """
   if tf.random.uniform(()) > 0.5:
     # random mirroring
     input_image = tf.image.flip_left_right(input_image)
     real_image = tf.image.flip_left_right(real_image)
-  """
 
   return input_image, real_image
+"""
 
 # normalizing the images to [-1, 1]
 def normalize(input_image, real_image):
@@ -85,8 +83,6 @@ def normalize(input_image, real_image):
   real_image = (real_image / 127.5) - 1
 
   return input_image, real_image
-
-
 
 #@tf.function()
 def load_image_train(image_file):
@@ -161,17 +157,17 @@ def Generator():
     downsample(256, 4), # (bs, 32, 32, 256)
     downsample(512, 4), # (bs, 16, 16, 512)
     downsample(512, 4), # (bs, 8, 8, 512)
-    downsample(512, 4), # (bs, 4, 4, 512)
-    downsample(512, 4), # (bs, 2, 2, 512)
-    downsample(512, 4), # (bs, 1, 1, 512)
+    #downsample(512, 4), # (bs, 4, 4, 512)
+    #downsample(512, 4), # (bs, 2, 2, 512)
+    #downsample(512, 4), # (bs, 1, 1, 512)
   ]
 
   up_stack = [
-    upsample(512, 4, apply_dropout=True), # (bs, 2, 2, 1024)
-    upsample(512, 4, apply_dropout=True), # (bs, 4, 4, 1024)
-    upsample(512, 4, apply_dropout=True), # (bs, 8, 8, 1024)
-    upsample(512, 4), # (bs, 16, 16, 1024)
-    upsample(256, 4), # (bs, 32, 32, 512)
+    #upsample(512, 4, apply_dropout=True), # (bs, 2, 2, 1024)
+    #upsample(512, 4, apply_dropout=True), # (bs, 4, 4, 1024)
+    #upsample(512, 4, apply_dropout=True), # (bs, 8, 8, 1024)
+    upsample(512, 4, apply_dropout=True), # (bs, 16, 16, 1024)
+    upsample(256, 4, apply_dropout=True), # (bs, 32, 32, 512)
     upsample(128, 4), # (bs, 64, 64, 256)
     upsample(64, 4), # (bs, 128, 128, 128)
   ]
@@ -205,7 +201,7 @@ def Generator():
 
   return tf.keras.Model(inputs=inputs, outputs=x)
 
-
+"""
 def Discriminator2():
   initializer = tf.random_normal_initializer(0., 0.02)
 
@@ -231,6 +227,7 @@ def Discriminator2():
   last = tf.keras.layers.Conv2D(1, 4, strides=1, padding='same', kernel_initializer=initializer)(leaky_relu) # (bs, 256, 256, 1)
 
   return tf.keras.Model(inputs=[inp, tar], outputs=last)
+"""
 
 
 def Discriminator():
@@ -291,15 +288,16 @@ def generator_loss(disc_generated_output, gen_output, target):
 
   # mean absolute error
   #l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
-  l1_loss = mae_holes(target, gen_output)
+  l1_loss = mse_holes(target, gen_output)
 
-  total_gen_loss = gan_loss + (LAMBDA * l1_loss)
+  #total_gen_loss = gan_loss + (LAMBDA * l1_loss)
+  total_gen_loss = l1_loss
 
   return total_gen_loss
 
 
 generator = Generator()
-discriminator = Discriminator2()
+discriminator = Discriminator()
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
@@ -332,30 +330,26 @@ def generate_images(model, test_input, tar, i=0):
 
 @tf.function
 def train_step(input_image, target):
-  target = tf.where(tf.math.is_nan(target), tf.zeros_like(target), target) # (bs, 256, 256, channels*2)
+  target_masked = tf.where(tf.math.is_nan(target), tf.zeros_like(target), target) # (bs, 256, 256, channels*2)
 
   with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
     gen_output = generator(input_image, training=True)
     mask = np.ones((1,256,256,1))
     mask[:,100:150, 150:200,:] = 0
     mask = tf.cast(mask, dtype=tf.float32)
-    gen_output = tf.math.multiply(gen_output, mask)
-
-    disc_real_output = discriminator([input_image, target], training=True)
-    disc_generated_output = discriminator([input_image, gen_output], training=True)
-
-    gen_loss = generator_loss(disc_generated_output, gen_output, target)
+    gen_output_masked = tf.math.multiply(gen_output, mask)
+    
+    disc_real_output = discriminator([input_image, target_masked], training=True)
+    disc_generated_output = discriminator([input_image, gen_output_masked], training=True)
     disc_loss = discriminator_loss(disc_real_output, disc_generated_output)
 
-  generator_gradients = gen_tape.gradient(gen_loss,
-                                          generator.trainable_variables)
-  discriminator_gradients = disc_tape.gradient(disc_loss,
-                                               discriminator.trainable_variables)
+    gen_loss = generator_loss(disc_generated_output, gen_output, target)
 
-  generator_optimizer.apply_gradients(zip(generator_gradients,
-                                          generator.trainable_variables))
-  discriminator_optimizer.apply_gradients(zip(discriminator_gradients,
-                                              discriminator.trainable_variables))
+  generator_gradients = gen_tape.gradient(gen_loss, generator.trainable_variables)
+  discriminator_gradients = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+
+  generator_optimizer.apply_gradients(zip(generator_gradients, generator.trainable_variables))
+  discriminator_optimizer.apply_gradients(zip(discriminator_gradients, discriminator.trainable_variables))
 
 checkpoint_dir = './training_checkpoints'
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
