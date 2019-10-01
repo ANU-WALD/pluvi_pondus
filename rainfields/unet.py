@@ -7,6 +7,7 @@ import time
 import matplotlib.pyplot as plt
 from nc_loader import HimfieldsDataset
 
+
 def mse_holes(y_true, y_pred):
     #idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
     idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
@@ -14,17 +15,6 @@ def mse_holes(y_true, y_pred):
     y_pred = tf.gather_nd(y_pred, idxs)
 
     return K.mean(K.square(y_true-y_pred), axis=-1)
-
-
-train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181102.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181103.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181105.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181106.nc"]
-train_dataset = HimfieldsDataset(train_fnames)
-
-test_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181104.nc"]
-test_dataset = HimfieldsDataset(test_fnames)
 
 
 def downsample(filters, size, apply_batchnorm=True):
@@ -61,6 +51,7 @@ def upsample(filters, size, apply_dropout=False):
   result.add(tf.keras.layers.ReLU())
 
   return result
+
 
 def Unet():
   down_stack = [
@@ -113,73 +104,22 @@ def Unet():
 
   return tf.keras.Model(inputs=inputs, outputs=x)
 
+
 def custom_loss(gen_output, target):
   # mean square error
   return mse_holes(gen_output, target)
 
 
-model = Unet()
-model.compile(optimizer=tf.keras.optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True), loss=custom_loss)
-model.fit_generator(train_dataset, epochs=5, verbose=1, validation_data=test_dataset)
+train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181102.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181103.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181104.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181105.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181106.nc"]
 
-exit()
-
-EPOCHS = 150
-
-def generate_images(model, test_input, tar, i=0):
-  # the training=True is intentional here since
-  # we want the batch statistics while running the model
-  # on the test dataset. If we use training=False, we will get
-  # the accumulated statistics learned from the training dataset
-  # (which we don't want)
-  prediction = model(test_input, training=True)
-  plt.imsave("pred_{:02d}.png".format(i), np.array(prediction[0] * 0.5 + 0.5)) 
-  plt.imsave("targ_{:02d}.png".format(i), np.array(tar[0] * 0.5 + 0.5)) 
-  return  
-  plt.imsave("test_{:02d}".format(i), test_input[0]) 
-  
-  plt.figure(figsize=(15,15))
-
-  display_list = [test_input[0], tar[0], prediction[0]]
-  title = ['Input Image', 'Ground Truth', 'Predicted Image']
-
-  for i in range(3):
-    plt.subplot(1, 3, i+1)
-    plt.title(title[i])
-    # getting the pixel values between [0, 1] to plot it.
-    plt.imshow(display_list[i] * 0.5 + 0.5)
-    plt.axis('off')
-  plt.show()
-
-@tf.function
-def train_step(input_image, target):
-
-  with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-    gen_output = generator(input_image, training=True)
-
-    gen_loss = generator_loss(gen_output, target)
-
-  generator_gradients = gen_tape.gradient(gen_loss,
-                                          generator.trainable_variables)
-
-  generator_optimizer.apply_gradients(zip(generator_gradients,
-                                          generator.trainable_variables))
-
-
-def fit(train_ds, epochs, test_ds):
-  for epoch in range(epochs):
-    print(epoch)
-    start = time.time()
-
-    # Train
-    for input_image, target in train_ds:
-      train_step(input_image, target)
-
-    for example_input, example_target in test_ds.take(1):
-      print("generate image called")
-      generate_images(generator, example_input, example_target, epoch)
-
-    print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1, time.time()-start))
-
-
-fit(train_dataset, EPOCHS, test_dataset)
+for n in [10,100]:
+  model = Unet()
+  model.compile(optimizer=tf.keras.optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True), loss=custom_loss)
+  train_dataset = HimfieldsDataset(train_fnames, n, batch_size=2)
+  test_dataset = HimfieldsDataset(train_fnames, n, batch_size=2)
+  model.fit_generator(train_dataset, epochs=10, verbose=1, validation_data=test_dataset)

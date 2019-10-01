@@ -39,9 +39,9 @@ def get_model_memory_usage(batch_size, model):
     return gbytes
 
 def mse_holes(y_true, y_pred):
-    idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
-    y_true = K.tf.gather_nd(y_true, idxs)
-    y_pred = K.tf.gather_nd(y_pred, idxs)
+    idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
+    y_true = tf.gather_nd(y_true, idxs)
+    y_pred = tf.gather_nd(y_pred, idxs)
 
     return K.mean(K.square(y_true-y_pred), axis=-1)
 
@@ -75,7 +75,7 @@ class DataGenerator(Sequence):
             if np.datetime64(d) not in h8_ds.time.data or np.datetime64(dp) not in h8p_ds.time.data:
                 continue
 
-            prec = xr.open_dataset(prec_fp).precipitation[2:, 402:].data
+            prec = xr.open_dataset(rf_fp).precipitation[2:, 402:].data
             b8 = xr.open_dataset(h8_fp).B8.sel(time=d)[2:, 402:].data
             b14 = xr.open_dataset(h8_fp).B14.sel(time=d)[2:, 402:].data
             b8p = xr.open_dataset(h8p_fp).B8.sel(time=dp)[2:, 402:].data
@@ -186,7 +186,7 @@ validation_gen = DataGenerator(batch_size=1, length=100)
 
 model = get_unet()
 print(get_model_memory_usage(1, model), "GBs")
-exit()
+#exit()
 
 #history = model.fit(x_train, y_train, epochs=50, batch_size=4, validation_data=(x_test, y_test))
 #history = model.fit_generator(generator=training_gen, validation_data=validation_gen, use_multiprocessing=True, workers=2)
