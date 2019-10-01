@@ -62,28 +62,24 @@ class DataGenerator(Sequence):
             n = random.randint(1,6*24*6)
             d = datetime(2018,11,1,0,0) + timedelta(0,10*60*n)
             dp = d - timedelta(0,10*60)
-            rf_fp = "/data/pluvi_pondus/Rainfields/{}/310_{}_{}00.prcp-c10.npy".format(int(d.strftime("%d")), d.strftime("%Y%m%d"), d.strftime("%H%M"))
-            b8_fp = "/data/pluvi_pondus/HIM8_AU_{}_B8_{}.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
-            b14_fp = "/data/pluvi_pondus/HIM8_AU_{}_B14_{}.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
-            b8p_fp = "/data/pluvi_pondus/HIM8_AU_{}_B8_{}.npy".format(dp.strftime("%Y%m%d"), dp.strftime("%H%M%S"))
-            b14p_fp = "/data/pluvi_pondus/HIM8_AU_{}_B14_{}.npy".format(dp.strftime("%Y%m%d"), dp.strftime("%H%M%S"))
+            rf_fp = "/data/pluvi_pondus/Rainfields/310_{}_{}.prcp-c10.nc".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
+            h8_fp = "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_{}.nc".format(d.strftime("%Y%m%d"))
+            h8p_fp = "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_{}.nc".format(dp.strftime("%Y%m%d"))
             
-            if not os.path.exists(rf_fp) or not os.path.exists(b8_fp) or not os.path.exists(b8p_fp):
+            if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
                 continue
            
-            """
-            b8 = np.load(b8_fp)[2::2, 402::2]
-            b14 = np.load(b14_fp)[2::2, 402::2]
-            b8p = np.load(b8p_fp)[2::2, 402::2]
-            b14p = np.load(b14p_fp)[2::2, 402::2]
-            prec = np.load(rf_fp)[2::2, 402::2]
-            """
-            
-            b8 = np.load(b8_fp)[2:, 402:]
-            b14 = np.load(b14_fp)[2:, 402:]
-            b8p = np.load(b8p_fp)[2:, 402:]
-            b14p = np.load(b14p_fp)[2:, 402:]
-            prec = np.load(rf_fp)[2:, 402:]
+            h8_ds = xr.open_dataset(h8_fp)
+            h8p_ds = xr.open_dataset(h8p_fp)
+
+            if np.datetime64(d) not in h8_ds.time.data or np.datetime64(dp) not in h8p_ds.time.data:
+                continue
+
+            prec = xr.open_dataset(prec_fp).precipitation[2:, 402:].data
+            b8 = xr.open_dataset(h8_fp).B8.sel(time=d)[2:, 402:].data
+            b14 = xr.open_dataset(h8_fp).B14.sel(time=d)[2:, 402:].data
+            b8p = xr.open_dataset(h8p_fp).B8.sel(time=dp)[2:, 402:].data
+            b14p = xr.open_dataset(h8p_fp).B14.sel(time=dp)[2:, 402:].data
 
             x.append(np.stack((b8p,b14p,b8,b14), axis=-1))
             #x.append(np.stack((b8,b14), axis=-1))
