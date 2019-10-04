@@ -62,9 +62,9 @@ class DataGenerator(Sequence):
             n = random.randint(1,6*24*6)
             d = datetime(2018,11,1,0,0) + timedelta(0,10*60*n)
             dp = d - timedelta(0,10*60)
-            rf_fp = "/data/pluvi_pondus/Rainfields/310_{}_{}.prcp-c10.nc".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
-            h8_fp = "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_{}.nc".format(d.strftime("%Y%m%d"))
-            h8p_fp = "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_{}.nc".format(dp.strftime("%Y%m%d"))
+            rf_fp = "/home/lar116/project/pablo/rainfields_data/310_{}_{}.prcp-c10.npy".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
+            h8_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(d.strftime("%Y%m%d"))
+            h8p_fp = "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_{}.nc".format(dp.strftime("%Y%m%d"))
             
             if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
                 continue
@@ -75,11 +75,11 @@ class DataGenerator(Sequence):
             if np.datetime64(d) not in h8_ds.time.data or np.datetime64(dp) not in h8p_ds.time.data:
                 continue
 
-            prec = xr.open_dataset(rf_fp).precipitation[2:, 402:].data
-            b8 = xr.open_dataset(h8_fp).B8.sel(time=d)[2:, 402:].data
-            b14 = xr.open_dataset(h8_fp).B14.sel(time=d)[2:, 402:].data
-            b8p = xr.open_dataset(h8p_fp).B8.sel(time=dp)[2:, 402:].data
-            b14p = xr.open_dataset(h8p_fp).B14.sel(time=dp)[2:, 402:].data
+            prec = np.load(rf_fp)[2:, 402:]
+            b8 = h8_ds.B8.sel(time=d)[2:, 402:].data
+            b14 = h8_ds.B14.sel(time=d)[2:, 402:].data
+            b8p = h8p_ds.B8.sel(time=dp)[2:, 402:].data
+            b14p = h8p_ds.B14.sel(time=dp)[2:, 402:].data
 
             x.append(np.stack((b8p,b14p,b8,b14), axis=-1))
             #x.append(np.stack((b8,b14), axis=-1))
@@ -99,7 +99,7 @@ def get_unet():
     #inputs = layers.Input(shape = (1024, 1024, 4))
     inputs = layers.Input(shape = (2048,2048,4))
 
-    feats = 16
+    feats = 8
     bn0 = BatchNormalization(axis=3)(inputs)
     conv1 = layers.Conv2D(feats, (3, 3), activation='relu', padding='same', name='conv1_1')(bn0)
     bn1 = BatchNormalization(axis=3)(conv1)
@@ -181,8 +181,8 @@ def get_unet():
 
     return model
 
-training_gen = DataGenerator(batch_size=1, length=400)
-validation_gen = DataGenerator(batch_size=1, length=100)
+training_gen = DataGenerator(batch_size=4, length=400)
+validation_gen = DataGenerator(batch_size=4, length=100)
 
 model = get_unet()
 print(get_model_memory_usage(1, model), "GBs")
