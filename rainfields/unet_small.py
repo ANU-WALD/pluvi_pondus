@@ -118,7 +118,7 @@ def get_unet():
 
     return model
 
-def downsample(filters, first=False):
+def downsample(filters, first=False, last=False):
 
   result = tf.keras.Sequential()
 
@@ -129,7 +129,8 @@ def downsample(filters, first=False):
   result.add(tf.keras.layers.BatchNormalization(axis=3))
   result.add(tf.keras.layers.Conv2D(filters, (3, 3), strides=1, padding='same', activation='relu'))
   result.add(tf.keras.layers.BatchNormalization(axis=3))
-  result.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
+  if not last:
+    result.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
 
   return result
 
@@ -138,7 +139,6 @@ def upsample(filters, first=False, last=False):
 
   result = tf.keras.Sequential()
   
-  result.add(tf.keras.layers.UpSampling2D(size=(2, 2)))
   result.add(tf.keras.layers.Conv2D(filters, (3, 3), strides=1, padding='same', activation='relu'))
   result.add(tf.keras.layers.BatchNormalization(axis=3))
   result.add(tf.keras.layers.Conv2D(filters, (3, 3), strides=1, padding='same', activation='relu'))
@@ -148,16 +148,18 @@ def upsample(filters, first=False, last=False):
 
 
 def Unet():
-  feats = 16
+  feats = 8
   down_stack = [
     downsample(feats, first=True), #512
     downsample(feats*2), #256
     downsample(feats*4), #128
     downsample(feats*8), #64
     downsample(feats*16), #32
+    downsample(feats*32, last=True), #32
   ]
 
   up_stack = [
+    upsample(feats*16), #32
     upsample(feats*8), #64
     upsample(feats*4), #128
     upsample(feats*2), #256
@@ -176,14 +178,14 @@ def Unet():
     x = down(x)
     skips.append(x)
 
-  skips = reversed(skips[:-1])
+  skips = reversed(skips[:-2])
 
   concat = tf.keras.layers.Concatenate()
   # Upsampling and establishing the skip connections
   for up, skip in zip(up_stack, skips):
-    x = up(x)
-    #up2 = concatenate([UpSampling2D((2, 2), data_format=IMAGE_ORDERING)(conv4), conv1], axis=MERGE_AXIS)
-    x = concat([x, skip])
+    #x = up(x)
+    x = concat([tf.keras.layers.UpSampling2D(size=(2, 2))(x), skip])
+    #x = concat([x, skip])
 
   x = last(upper(x))
 
@@ -208,16 +210,19 @@ train_fnames = ["/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_20181101.n
                 "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_20181105.nc",
                 "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_20181106.nc"]
 
-training_gen = HimfieldsDataset(train_fnames, 1, batch_size=8)
-validation_gen = HimfieldsDataset(train_fnames, 1, batch_size=8)
+#training_gen = HimfieldsDataset(train_fnames, 1, batch_size=4)
+#validation_gen = HimfieldsDataset(train_fnames, 1, batch_size=4)
   
 #model = get_unet()
 model = Unet()
-#parallel_model = multi_gpu_model(model, gpus=4)
-sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-model.compile(loss=mse_holes, optimizer=sgd)
 print(model.summary())
-history = model.fit_generator(generator=training_gen, validation_data=validation_gen, epochs=100)
+exit()
+
+parallel_model = multi_gpu_model(model, gpus=4)
+sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+parallel_model.compile(loss=mse_holes, optimizer=sgd)
+print(parallel_model.summary())
+history = parallel_model.fit_generator(generator=training_gen, validation_data=validation_gen, epochs=100)
 
 with open('train_history_him8_8batch.pkl', 'wb') as f:
     pickle.dump(history.history, f)
