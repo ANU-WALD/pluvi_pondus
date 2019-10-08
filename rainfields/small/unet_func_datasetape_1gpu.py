@@ -131,7 +131,7 @@ def train(train_dataset, test_dataset):
   model = Unet()
   optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
 
-  for epoch in range(10):
+  for epoch in range(100):
     print("EPOCH: {}".format(epoch))
     epoch_loss_avg = tf.keras.metrics.Mean()
 
