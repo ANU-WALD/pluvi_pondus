@@ -1,10 +1,10 @@
-from keras import layers
-from keras import models
-from keras.layers import BatchNormalization, Conv2D, UpSampling2D, MaxPooling2D, Dropout
-from keras.optimizers import SGD, Adam
-from keras.utils import Sequence
+from tensorflow.keras import layers
+from tensorflow.keras import models
+from tensorflow.keras.layers import BatchNormalization, Conv2D, UpSampling2D, MaxPooling2D, Dropout
+from tensorflow.keras.optimizers import SGD, Adam
+from tensorflow.keras.utils import Sequence
 import numpy as np
-from keras import backend as K
+from tensorflow.keras import backend as K
 import tensorflow as tf
 import xarray as xr
 from datetime import datetime
@@ -185,7 +185,7 @@ training_gen = DataGenerator(batch_size=4, length=400)
 validation_gen = DataGenerator(batch_size=4, length=100)
 
 model = get_unet()
-print(get_model_memory_usage(1, model), "GBs")
+#print(get_model_memory_usage(1, model), "GBs")
 #exit()
 
 #history = model.fit(x_train, y_train, epochs=50, batch_size=4, validation_data=(x_test, y_test))

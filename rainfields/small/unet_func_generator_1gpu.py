@@ -5,7 +5,7 @@ from tensorflow.keras.optimizers import SGD, Adam
 from tensorflow.keras.utils import Sequence
 from tensorflow.keras.utils import multi_gpu_model
 import numpy as np
-from keras import backend as K
+from tensorflow.keras import backend as K
 import tensorflow as tf
 import xarray as xr
 from datetime import datetime
@@ -40,9 +40,9 @@ def get_model_memory_usage(batch_size, model):
     return gbytes
 
 def mse_holes(y_true, y_pred):
-    idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
-    y_true = K.tf.gather_nd(y_true, idxs)
-    y_pred = K.tf.gather_nd(y_pred, idxs)
+    idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
+    y_true = tf.gather_nd(y_true, idxs)
+    y_pred = tf.gather_nd(y_pred, idxs)
 
     return K.mean(K.square(y_true-y_pred), axis=-1)
 
