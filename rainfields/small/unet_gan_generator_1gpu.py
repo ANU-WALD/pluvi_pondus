@@ -225,7 +225,6 @@ def fit(train_ds, test_ds, epochs):
       train_step(inputs, target)
       train_loss(calc_loss(generator, inputs, target))
     
-    epoch_loss_avg = tf.keras.metrics.Mean()
     for batch, (inputs, target) in enumerate(test_ds):
       test_loss(calc_loss(generator, inputs, target))
 
@@ -241,7 +240,8 @@ def fit(train_ds, test_ds, epochs):
     print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1, time.time()-start))
 
   f.close()
-  generator.save('gan_model.h5')
+  generator.save('gan_generator.h5')
+  discriminator.save('gan_discriminator.h5')
 
 
 train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
@@ -254,6 +254,6 @@ train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
 
 train_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
 test_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
-EPOCHS = 100
+EPOCHS = 40
 fit(train_dataset, test_dataset, EPOCHS)
 

@@ -128,31 +128,34 @@ def calc_loss(model, inputs, outputs):
     return mse_holes(outputs, model(inputs))
 
 
-def train(train_dataset, test_dataset):
+def train(train_dataset, test_dataset, epochs):
   model = Unet()
   optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
+  
+  train_loss = tf.keras.metrics.Mean()
+  test_loss = tf.keras.metrics.Mean()
+  template = 'Epoch {}, Loss: {:.4f}, Test Loss: {:.4f}\n'
 
-  for epoch in range(100):
-    print("EPOCH: {}".format(epoch))
-    train_loss = tf.keras.metrics.Mean()
-    test_loss = tf.keras.metrics.Mean()
+  f = open("train_record_unet.out","w+")
+
+  for epoch in range(epochs):
 
     for (batch, (inputs, outputs)) in enumerate(train_dataset):
-      #current_loss = mse_holes(outputs, model(inputs))
       train_step(model, inputs, outputs, optimizer)
-      #loss = mse_holes(outputs, model(inputs))
       train_loss(calc_loss(model, inputs, outputs))
 
-    print("Average training loss:", train_loss.result())
-    
-    epoch_loss_avg = tf.keras.metrics.Mean()
     for (inputs, outputs) in test_dataset:
       test_loss(calc_loss(model, inputs, outputs))
+    
+    print(template.format(epoch+1, train_loss.result(), test_loss.result()))
+    f.write(template.format(epoch+1, train_loss.result(), test_loss.result()))
+    f.flush() 
 
-    print("Average test loss:", test_loss.result())
     train_loss.reset_states()
     test_loss.reset_states()
 
+  f.close()
+  model.save('unet.h5')
 
 
 """
@@ -171,6 +174,7 @@ train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
                 "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181105.nc",
                 "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181106.nc"]
 
-training_gen = HimfieldsDataset(train_fnames, 1, batch_size=6)
-test_gen = HimfieldsDataset(train_fnames, 1, batch_size=6)
-train(training_gen, test_gen)
+train_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
+test_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
+EPOCHS = 40
+train(train_dataset, test_dataset, EPOCHS)
