@@ -162,8 +162,10 @@ def generator_loss(disc_generated_output, gen_output, target):
   return total_gen_loss
 
 
-generator = Generator()
-discriminator = Discriminator()
+#generator = Generator()
+generator= tf.keras.models.load_model('gan_generator.h5')
+#discriminator = Discriminator()
+discriminator = tf.keras.models.load_model('gan_discriminator.h5')
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
@@ -254,6 +256,6 @@ train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
 
 train_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
 test_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
-EPOCHS = 40
+EPOCHS = 25
 fit(train_dataset, test_dataset, EPOCHS)
 
