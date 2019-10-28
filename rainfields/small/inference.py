@@ -34,68 +34,98 @@ cm = LinearSegmentedColormap.from_list("BOM-RF3", color_list, N=32)
 
 #####################################################################################################################
 
+gan = load_model('gan_generator.h5')
+mse = load_model('unet.h5')
 
+for nd in range(27,28):
+    #stack = None
+    print("gan day", nd)
+    d = datetime(2018, 11, nd, 0, 0)
+    i = 0
 
-def mse_holes(y_true, y_pred):
-    idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
-    y_true = K.tf.gather_nd(y_true, idxs)
-    y_pred = K.tf.gather_nd(y_pred, idxs)
+    for index in range(6*24):
+        dp = d - timedelta(0,10*60)
+        rf_fp = "/data/pluvi_pondus/Rainfields/310_{}_{}.prcp-c10.nc".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
+        h8_fp = "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_{}.nc".format(d.strftime("%Y%m%d"))
+        h8p_fp = "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_{}.nc".format(dp.strftime("%Y%m%d"))
 
-    return K.mean(K.square(y_true-y_pred), axis=-1)
-
-#model = load_model('gan_generator.h5')
-model = load_model('unet.h5')
-
-d = datetime(2018,11,1,0,10)
-i = 0
-for index in range(6*24*6):
-    print(index, d)
-    dp = d - timedelta(0,10*60)
-    rf_fp = "/data/pluvi_pondus/Rainfields/310_{}_{}.prcp-c10.nc".format(d.strftime("%Y%m%d"), d.strftime("%H%M%S"))
-    h8_fp = "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_{}.nc".format(d.strftime("%Y%m%d"))
-    h8p_fp = "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_{}.nc".format(dp.strftime("%Y%m%d"))
-
-    print(rf_fp)
-    print(h8_fp)
-
-    if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
-        d += timedelta(0,10*60)
-        print("?", rf_fp)
-        print("?", h8_fp)
-        continue
+        #if not os.path.exists(rf_fp) or not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
+        if not os.path.exists(h8_fp) or not os.path.exists(h8p_fp):
+            """
+            out = np.empty((1,1025,1225), dtype=np.float32)
+            if stack is None:
+                stack = out
+            else:
+                stack = np.concatenate((stack,out), axis=0)
+            """
+            d += timedelta(0,10*60)
+            continue
            
-    rf_ds = xr.open_dataset(rf_fp)
-    h8_ds = xr.open_dataset(h8_fp)
-    h8p_ds = xr.open_dataset(h8p_fp)
+        #rf_ds = xr.open_dataset(rf_fp)
+        h8_ds = xr.open_dataset(h8_fp)
+        h8p_ds = xr.open_dataset(h8p_fp)
             
-    if np.datetime64(d) not in h8_ds.time.data or np.datetime64(dp) not in h8p_ds.time.data:
-        d += timedelta(0,10*60)
-        continue
+        if np.datetime64(d) not in h8_ds.time.data or np.datetime64(dp) not in h8p_ds.time.data:
+            """
+            out = np.empty((1,1025,1225), dtype=np.float32)
+            if stack is None:
+                stack = out
+            else:
+                stack = np.concatenate((stack,out), axis=0)
+            """
+            d += timedelta(0,10*60)
+            continue
            
-    prec = rf_ds.precipitation.data[2::2, 402::2]
-    b8 = h8_ds.B8.sel(time=d).data[2::2, 402::2]
-    b14 = h8_ds.B14.sel(time=d).data[2::2, 402::2]
-    b8p = h8p_ds.B8.sel(time=dp).data[2::2, 402::2]
-    b14p =h8p_ds.B14.sel(time=dp).data[2::2, 402::2]
-
-    rf_ds.close()
-    h8_ds.close()
-    h8p_ds.close()
+        #prec = rf_ds.precipitation.data[::2, ::2]
+        #print(prec.shape)
+        #exit()
+        #plt.imsave("rainfields_{:03d}.png".format(i), np.clip(prec,0,10), vmin=0, vmax=10, cmap=cm)
+        #print("P:", np.nanmax(prec))
     
-    print("Rainfieds: ", np.nanmax(prec))
-   
-    x = np.stack((b8p,b14p,b8,b14), axis=-1)
-    print(x.shape, x.min(), x.max(), x[0,0,0]) 
-    #imageio.imwrite("h8_b8_{:03d}.png".format(i), x[:,:,0])
-    #plt.imsave("h8_b8_{:03d}.png".format(i), x[2:,402:,0], cmap='gray')
-    #imageio.imwrite("rainfields_{:03d}.png".format(i), np.clip(prec, 0, 5)/5)
-    #plt.imsave("rainfields_{:03d}.png".format(i), np.clip(prec,0,10), vmin=0, vmax=10, cmap=cm)
+        b8 = h8_ds.B8.sel(time=d).data[::2, ::2]
+        b14 = h8_ds.B14.sel(time=d).data[::2, ::2]
+        b8p = h8p_ds.B8.sel(time=dp).data[::2, ::2]
+        b14p =h8p_ds.B14.sel(time=dp).data[::2, ::2]
+    
+        #rf_ds.close()
+        h8_ds.close()
+        h8p_ds.close()
 
-    out = model.predict(x[None,:,:,:])
-    print("NN: ", out.max())
-    #imageio.imwrite("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0], 0, 3)/3)
-    plt.imsave("forecast_mse_{:03d}.png".format(i), np.clip(out[0,:,:,0],0,10), vmin=0, vmax=10, cmap=cm)
+        x = np.stack((b8p,b14p,b8,b14), axis=-1)
 
-    d += timedelta(0,10*60)
-    i+=1
+        out = np.zeros((1025, 1225), dtype=np.float32)[None,:,:]
+        out[:,:-1,:-201] = gan.predict(x[None,:-1,:-201,:])[:,:,:,0]
+        out[:,1:,201:] = gan.predict(x[None,1:,201:,:])[:,:,:,0]
+        out[:,-20:,:] = 0
+        print(out.max())
+        plt.imsave("forecast_gan_{}.png".format(d.strftime("%Y%m%dT%H%M00")), np.clip(out[0,:,:], 0, 10), vmin=0, vmax=10, cmap=cm)
+        
+        out = np.zeros((1025, 1225), dtype=np.float32)[None,:,:]
+        out[:,:-1,:-201] = mse.predict(x[None,:-1,:-201,:])[:,:,:,0]
+        out[:,1:,201:] = mse.predict(x[None,1:,201:,:])[:,:,:,0]
+        print(out.max())
+        plt.imsave("forecast_mse_{}.png".format(d.strftime("%Y%m%dT%H%M00")), np.clip(out[0,:,:], 0, 10), vmin=0, vmax=10, cmap=cm)
 
+        """
+        if stack is None:
+            stack = out
+        else:
+            stack = np.concatenate((stack,out), axis=0)
+        """
+        #plt.imsave("forecastA_mse_{:03d}.png".format(i), np.clip(a[0,:,:,0],0,10), vmin=0, vmax=10, cmap=cm)
+
+        #print("F", out.max())
+        #plt.imsave("forecast_mse_{:03d}.png".format(i), np.clip(out,0,10), vmin=0, vmax=10, cmap=cm)
+
+        #print(x.shape, x.min(), x.max(), x[0,0,0]) 
+        #imageio.imwrite("h8_b8_{:03d}.png".format(i), x[:,:,0])
+        #plt.imsave("h8_b8_{:03d}.png".format(i), x[2:,402:,0], cmap='gray')
+        #imageio.imwrite("rainfields_{:03d}.png".format(i), np.clip(prec, 0, 5)/5)
+
+        #imageio.imwrite("forecasted_{:03d}.png".format(i), np.clip(out[0,:,:,0], 0, 3)/3)
+        #plt.imsave("forecast_mse_{:03d}.png".format(i), np.clip(out[0,:,:,0],0,10), vmin=0, vmax=10, cmap=cm)
+
+        d += timedelta(0,10*60)
+        i+=1
+
+    #np.save("gan_{}".format(nd), stack)
