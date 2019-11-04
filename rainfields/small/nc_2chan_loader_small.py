@@ -3,11 +3,12 @@ import tensorflow as tf
 import numpy as np
 import datetime
 import os
+import random
 
 tf.compat.v1.enable_eager_execution()
 
 class gen:
-    def __call__(self, fname, mult):
+    def __call__(self, fname, mult, jitter=False):
         dsg = xr.open_dataset(fname.decode("utf-8"))
         for t in dsg.time:
             d = datetime.datetime.utcfromtimestamp(t.astype(int) * 1e-9)
@@ -21,10 +22,14 @@ class gen:
             #prec = np.load(rf_fp)[2::2, 402::2]
             rf_fp = "/data/pluvi_pondus/Rainfields/310_{}.prcp-c10.nc".format(d.strftime("%Y%m%d_%H%M%S"))
             dsp = xr.open_dataset(rf_fp)
-            prec = dsp['precipitation'].data[2::2, 402::2]
-
-            b8 = dsg['B8'].sel(time=t).data[2::2, 402::2]
-            b14 = dsg['B14'].sel(time=t).data[2::2, 402::2]
+            prec = dsp['precipitation'].data[::2, ::2]
+            b8 = dsg['B8'].sel(time=t).data[::2, ::2]
+            b14 = dsg['B14'].sel(time=t).data[::2, ::2]
+            i = random.randint(0, 201)
+            j = random.randint(0, 1)
+            prec = prec[j:j+1024, i:i+1024]
+            b8 = b8[j:j+1024, i:i+1024]
+            b14 = b14[j:j+1024, i:i+1024]
 
             yield (np.stack((b8,b14), axis=-1), prec[:, :, None])
 
@@ -37,5 +42,6 @@ def HimfieldsDataset(fnames, mult, batch_size=2):
     ds = ds.interleave(lambda fname: tf.data.Dataset.from_generator(gen(), (tf.float32, tf.float32), (tf.TensorShape([1024, 1024, 2]), tf.TensorShape([1024, 1024, 1])), args=(fname, mult)), cycle_length=len(fnames), block_length=1, num_parallel_calls=None)
     #ds = ds.shuffle(864, seed=None)
     ds = ds.shuffle(128, seed=None)
+    ds = ds.batch(batch_size)
 
-    return ds.batch(batch_size)
+    return ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)

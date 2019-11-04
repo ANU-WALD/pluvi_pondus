@@ -9,11 +9,11 @@ import time
 
 import matplotlib.pyplot as plt
 
-from nc_2chan_loader_small import HimfieldsDataset
+from nc_loader_small import HimfieldsDataset
 
 def Generator():
     concat_axis = 3
-    inputs = layers.Input(shape = (1024, 1024, 2))
+    inputs = layers.Input(shape = (1024, 1024, 4))
 
     feats = 16
     bn0 = layers.BatchNormalization(axis=3)(inputs)
@@ -115,7 +115,7 @@ def Discriminator():
   initializer = tf.random_normal_initializer(0., 0.02)
 
   tar = tf.keras.layers.Input(shape=[None, None, 1], name='target_image')
-  inp = tf.keras.layers.Input(shape=[None, None, 2], name='input_image')
+  inp = tf.keras.layers.Input(shape=[None, None, 4], name='input_image')
 
   x = tf.keras.layers.concatenate([inp, tar])
 
@@ -154,8 +154,7 @@ def generator_loss(disc_generated_output, gen_output, target):
 
   # mean absolute error
   #l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
-  l1_loss = mae_holes(target, gen_output)
-  #l2_loss = mse_holes(target, gen_output)
+  l1_loss = mse_holes(target, gen_output)
 
   total_gen_loss = gan_loss + (LAMBDA * l1_loss)
   #total_gen_loss = l1_loss
@@ -164,9 +163,9 @@ def generator_loss(disc_generated_output, gen_output, target):
 
 
 #generator = Generator()
-generator= tf.keras.models.load_model('gan_2chanrc_generator.h5')
+generator= tf.keras.models.load_model('gan_generator.h5')
 #discriminator = Discriminator()
-discriminator = tf.keras.models.load_model('gan_2chanrc_discriminator.h5')
+discriminator = tf.keras.models.load_model('gan_discriminator.h5')
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
@@ -177,12 +176,6 @@ def mse_holes(y_true, y_pred):
 
     return K.mean(K.square(y_true-y_pred), axis=-1)
 
-def mae_holes(y_true, y_pred):
-    idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
-    y_true = tf.gather_nd(y_true, idxs)
-    y_pred = tf.gather_nd(y_pred, idxs)
-
-    return K.mean(K.abs(y_true-y_pred), axis=-1)
 
 @tf.function
 def calc_loss(model, inputs, outputs):
@@ -209,45 +202,22 @@ def train_step(input_image, target):
   discriminator_optimizer.apply_gradients(zip(discriminator_gradients, discriminator.trainable_variables))
 
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
-
-color_list = np.array([(255, 255, 255),  # 0.0
-                       (245, 245, 255),  # 0.2
-                       (180, 180, 255),  # 0.5
-                       (120, 120, 255),  # 1.5
-                       (20,  20, 255),   # 2.5
-                       (0, 216, 195),    # 4.0
-                       (0, 150, 144),    # 6.0
-                       (0, 102, 102),    # 10
-                       (255, 255,   0),  # 15
-                       (255, 200,   0),  # 20
-                       (255, 150,   0),  # 30
-                       (255, 100,   0),  # 40
-                       (255,   0,   0),  # 50
-                       (200,   0,   0),  # 60
-                       (120,   0,   0),  # 75
-                       (40,   0,   0)])  # > 100
-
-color_list = color_list/255.
-cm = LinearSegmentedColormap.from_list("BOM-RF3", color_list, N=32)
 
 def plot_output(epoch, model, inputs, target):
     print("Ref min: {}, max: {}, mean: {}".format(np.nanmin(target[0,:,:,0]), np.nanmax(target[0,:,:,0]), np.nanmean(target[0,:,:,0])))
     masked = np.where(np.isnan(target[0,:,:,0]), np.nan, model(inputs)[0,:,:,0]) 
     print("Out min: {}, max: {}, mean: {}".format(np.nanmin(masked), np.nanmax(masked), np.nanmean(masked)))
 
-    plt.imsave("ref_{:03d}.png".format(epoch), target[0,:,:,0], vmin=0, vmax=10, cmap=cm)
-    plt.imsave("out_{:03d}.png".format(epoch), model(inputs)[0,:,:,0], vmin=0, vmax=10, cmap=cm)
+    plt.imsave("ref_{:03d}.png".format(epoch), target[0,:,:,0])
+    plt.imsave("out_{:03d}.png".format(epoch), model(inputs)[0,:,:,0])
     plt.imsave("in_{:03d}.png".format(epoch), inputs[0,:,:,0])
-
 
 def fit(train_ds, test_ds, epochs):
   train_loss = tf.keras.metrics.Mean()
   test_loss = tf.keras.metrics.Mean()
   template = 'Epoch {}, Loss: {:.4f}, Test Loss: {:.4f}\n'
 
-  f = open("train_record_2chan.out","w+")
+  f = open("train_record.out","w+")
 
   for epoch in range(epochs):
     start = time.time()
@@ -272,8 +242,8 @@ def fit(train_ds, test_ds, epochs):
     print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1, time.time()-start))
 
   f.close()
-  generator.save('gan_2chanrc_generator.h5')
-  discriminator.save('gan_2chanrc_discriminator.h5')
+  generator.save('gan_generator.h5')
+  discriminator.save('gan_discriminator.h5')
 
 
 train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
@@ -281,32 +251,11 @@ train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
                 "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181103.nc",
                 "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181104.nc",
                 "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181105.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181106.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181107.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181108.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181109.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181110.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181111.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181112.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181113.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181114.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181115.nc"]
-
-test_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181120.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181121.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181122.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181123.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181124.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181125.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181126.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181127.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181128.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181129.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181130.nc"]
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181106.nc"]
 
 
 train_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
-test_dataset = HimfieldsDataset(test_fnames, 1, batch_size=4)
-EPOCHS = 50
+test_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
+EPOCHS = 25
 fit(train_dataset, test_dataset, EPOCHS)
 
