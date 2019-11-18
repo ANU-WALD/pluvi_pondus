@@ -7,16 +7,14 @@ import tensorflow as tf
 import os
 import time
 
-import matplotlib.pyplot as plt
+from data_loader_2chan_rainfields import HimfieldsDataset
 
-from nc_loader_small import HimfieldsDataset
-
-def Generator():
+def Unet():
     concat_axis = 3
-    inputs = layers.Input(shape = (1024, 1024, 4))
+    ref_input = layers.Input(shape = (1024, 1024, 2))
 
     feats = 16
-    bn0 = layers.BatchNormalization(axis=3)(inputs)
+    bn0 = layers.BatchNormalization(axis=3)(ref_input)
     conv1 = layers.Conv2D(feats, (3, 3), activation='relu', padding='same', name='conv1_1')(bn0)
     bn1 = layers.BatchNormalization(axis=3)(conv1)
     conv1 = layers.Conv2D(feats, (3, 3), activation='relu', padding='same')(bn1)
@@ -27,18 +25,20 @@ def Generator():
     conv2 = layers.Conv2D(2*feats, (3, 3), activation='relu', padding='same')(bn3)
     bn4 = layers.BatchNormalization(axis=3)(conv2)
     pool2 = layers.MaxPooling2D(pool_size=(2, 2))(bn4)
-
+    
     conv3 = layers.Conv2D(4*feats, (3, 3), activation='relu', padding='same')(pool2)
     bn5 = layers.BatchNormalization(axis=3)(conv3)
     conv3 = layers.Conv2D(4*feats, (3, 3), activation='relu', padding='same')(bn5)
     bn6 = layers.BatchNormalization(axis=3)(conv3)
     pool3 = layers.MaxPooling2D(pool_size=(2, 2))(bn6)
+   
 
     conv4 = layers.Conv2D(8*feats, (3, 3), activation='relu', padding='same')(pool3)
     bn7 = layers.BatchNormalization(axis=3)(conv4)
     conv4 = layers.Conv2D(8*feats, (3, 3), activation='relu', padding='same')(bn7)
     bn8 = layers.BatchNormalization(axis=3)(conv4)
     pool4 = layers.MaxPooling2D(pool_size=(2, 2))(bn8)
+
 
     conv5 = layers.Conv2D(16*feats, (3, 3), activation='relu', padding='same')(pool4)
     bn9 = layers.BatchNormalization(axis=3)(conv5)
@@ -91,83 +91,10 @@ def Generator():
     conv10 = layers.Conv2D(1, (1, 1), activation='relu')(bn18)
     #bn19 = BatchNormalization(axis=3)(conv10)
 
-    model = tf.keras.Model(inputs=inputs, outputs=conv10)
-
+    model = tf.keras.models.Model(inputs=ref_input, outputs=conv10)
 
     return model
 
-def downsample(filters, size, apply_batchnorm=True):
-  initializer = tf.random_normal_initializer(0., 0.02)
-
-  result = tf.keras.Sequential()
-  result.add(
-      tf.keras.layers.Conv2D(filters, size, strides=2, padding='same',
-                             kernel_initializer=initializer, use_bias=False))
-
-  if apply_batchnorm:
-    result.add(tf.keras.layers.BatchNormalization())
-
-  result.add(tf.keras.layers.LeakyReLU())
-
-  return result
-
-def Discriminator():
-  initializer = tf.random_normal_initializer(0., 0.02)
-
-  tar = tf.keras.layers.Input(shape=[None, None, 1], name='target_image')
-  inp = tf.keras.layers.Input(shape=[None, None, 4], name='input_image')
-
-  x = tf.keras.layers.concatenate([inp, tar])
-
-  down1 = downsample(64, 4, False)(x)
-  down2 = downsample(128, 4)(down1)
-  down3 = downsample(256, 4)(down2)
-
-  zero_pad1 = tf.keras.layers.ZeroPadding2D()(down3)
-  conv = tf.keras.layers.Conv2D(512, 4, strides=1,
-                                kernel_initializer=initializer,
-                                use_bias=False)(zero_pad1)
-
-  batchnorm1 = tf.keras.layers.BatchNormalization()(conv)
-  leaky_relu = tf.keras.layers.LeakyReLU()(batchnorm1)
-  zero_pad2 = tf.keras.layers.ZeroPadding2D()(leaky_relu)
-  last = tf.keras.layers.Conv2D(1, 4, strides=1, kernel_initializer=initializer)(zero_pad2)
-
-  return tf.keras.Model(inputs=[inp, tar], outputs=last)
-
-
-LAMBDA = 100
-
-loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-
-def discriminator_loss(disc_real_output, disc_generated_output):
-  real_loss = loss_object(tf.ones_like(disc_real_output), disc_real_output)
-  
-  generated_loss = loss_object(tf.zeros_like(disc_generated_output), disc_generated_output)
-
-  total_disc_loss = real_loss + generated_loss
-
-  return total_disc_loss
-
-def generator_loss(disc_generated_output, gen_output, target):
-  gan_loss = loss_object(tf.ones_like(disc_generated_output), disc_generated_output)
-
-  # mean absolute error
-  #l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
-  l1_loss = mse_holes(target, gen_output)
-
-  total_gen_loss = gan_loss + (LAMBDA * l1_loss)
-  #total_gen_loss = l1_loss
-
-  return total_gen_loss
-
-
-#generator = Generator()
-generator= tf.keras.models.load_model('gan_generator.h5')
-#discriminator = Discriminator()
-discriminator = tf.keras.models.load_model('gan_discriminator.h5')
-generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
-discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
 def mse_holes(y_true, y_pred):
     idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
@@ -176,74 +103,64 @@ def mse_holes(y_true, y_pred):
 
     return K.mean(K.square(y_true-y_pred), axis=-1)
 
+def msle_holes(y_true, y_pred):
+    #idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
+    idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
+    y_true = tf.gather_nd(y_true, idxs)
+    y_pred = tf.gather_nd(y_pred, idxs)
+
+    return K.mean(K.square(K.log(1+y_true)-K.log(1+y_pred)), axis=-1)
+
+
+@tf.function
+def train_step(model, inputs, outputs, optimizer):
+
+  with tf.GradientTape() as t:
+    loss = mse_holes(outputs, model(inputs, training=True))
+
+    grads = t.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
 
 @tf.function
 def calc_loss(model, inputs, outputs):
     return mse_holes(outputs, model(inputs))
 
-@tf.function
-def train_step(input_image, target):
-  target_masked = tf.where(tf.math.is_nan(target), tf.zeros_like(target), target)
-
-  with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-    gen_output = generator(input_image, training=True)
-    gen_output_masked = tf.where(tf.math.is_nan(target), tf.zeros_like(target), gen_output)
-    
-    disc_real_output = discriminator([input_image, target_masked], training=True)
-    disc_generated_output = discriminator([input_image, gen_output_masked], training=True)
-    disc_loss = discriminator_loss(disc_real_output, disc_generated_output)
-
-    gen_loss = generator_loss(disc_generated_output, gen_output, target)
-
-  generator_gradients = gen_tape.gradient(gen_loss, generator.trainable_variables)
-  discriminator_gradients = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
-
-  generator_optimizer.apply_gradients(zip(generator_gradients, generator.trainable_variables))
-  discriminator_optimizer.apply_gradients(zip(discriminator_gradients, discriminator.trainable_variables))
-
-import numpy as np
-
-def plot_output(epoch, model, inputs, target):
-    print("Ref min: {}, max: {}, mean: {}".format(np.nanmin(target[0,:,:,0]), np.nanmax(target[0,:,:,0]), np.nanmean(target[0,:,:,0])))
-    masked = np.where(np.isnan(target[0,:,:,0]), np.nan, model(inputs)[0,:,:,0]) 
-    print("Out min: {}, max: {}, mean: {}".format(np.nanmin(masked), np.nanmax(masked), np.nanmean(masked)))
-
-    plt.imsave("ref_{:03d}.png".format(epoch), target[0,:,:,0])
-    plt.imsave("out_{:03d}.png".format(epoch), model(inputs)[0,:,:,0])
-    plt.imsave("in_{:03d}.png".format(epoch), inputs[0,:,:,0])
 
 def fit(train_ds, test_ds, epochs):
+  model = Unet()
+  optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
+
   train_loss = tf.keras.metrics.Mean()
   test_loss = tf.keras.metrics.Mean()
   template = 'Epoch {}, Loss: {:.4f}, Test Loss: {:.4f}\n'
 
-  f = open("train_record.out","w+")
+  f = open("train_record_unet_mse_rainfields.out","w+")
 
   for epoch in range(epochs):
     start = time.time()
 
     # Train
-    for batch, (inputs, target) in enumerate(train_ds):
-      train_step(inputs, target)
-      train_loss(calc_loss(generator, inputs, target))
-    
-    for batch, (inputs, target) in enumerate(test_ds):
-      test_loss(calc_loss(generator, inputs, target))
+    for batch, (ref_input, target) in enumerate(train_ds):
+      train_step(model, ref_input, target, optimizer)
+      train_loss(calc_loss(model, ref_input, target))
+   
+
+    for batch, (ref_input, target) in enumerate(test_ds):
+      test_loss(calc_loss(model, ref_input, target))
+   
 
     print(template.format(epoch+1, train_loss.result(), test_loss.result()))
     f.write(template.format(epoch+1, train_loss.result(), test_loss.result()))
     f.flush() 
-   
+    
     train_loss.reset_states()
     test_loss.reset_states()
-
-    plot_output(epoch, generator, inputs, target)
 
     print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1, time.time()-start))
 
   f.close()
-  generator.save('gan_generator.h5')
-  discriminator.save('gan_discriminator.h5')
+  model.save('unet_mse_rainfields.h5')
 
 
 train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
@@ -253,9 +170,48 @@ train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
                 "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181105.nc",
                 "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181106.nc"]
 
+test_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181107.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181108.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181109.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181110.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181111.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181112.nc"]
 
-train_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
-test_dataset = HimfieldsDataset(train_fnames, 1, batch_size=4)
-EPOCHS = 25
+"""
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181113.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181114.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181115.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181116.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181117.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181118.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181119.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181110.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181111.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181112.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181113.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181114.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181115.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181116.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181117.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181118.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181119.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181115.nc"]
+
+test_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181120.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181121.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181122.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181123.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181124.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181125.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181126.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181127.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181128.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181129.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181130.nc"]
+"""
+
+train_dataset = HimfieldsDataset(train_fnames, False, batch_size=4)
+test_dataset = HimfieldsDataset(test_fnames, False, batch_size=4)
+
+EPOCHS = 15
 fit(train_dataset, test_dataset, EPOCHS)
-
