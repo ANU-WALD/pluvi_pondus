@@ -28,8 +28,9 @@ def Unet():
     pool2 = layers.MaxPooling2D(pool_size=(2, 2))(bn4)
     
     zadd = layers.concatenate([z_input, pool2], axis=concat_axis)
+    nzadd = layers.BatchNormalization(axis=3)(zadd)
 
-    conv3 = layers.Conv2D(4*feats, (3, 3), activation='relu', padding='same')(zadd)
+    conv3 = layers.Conv2D(4*feats, (3, 3), activation='relu', padding='same')(nzadd)
     bn5 = layers.BatchNormalization(axis=3)(conv3)
     conv3 = layers.Conv2D(4*feats, (3, 3), activation='relu', padding='same')(bn5)
     bn6 = layers.BatchNormalization(axis=3)(conv3)

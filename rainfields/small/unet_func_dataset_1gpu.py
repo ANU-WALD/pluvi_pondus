@@ -62,6 +62,7 @@ def get_unet():
     conv1 = layers.Conv2D(feats, (3, 3), activation='relu', padding='same')(bn1)
     bn2 = BatchNormalization(axis=3)(conv1)
     pool1 = layers.MaxPooling2D(pool_size=(2, 2))(bn2)
+
     conv2 = layers.Conv2D(2*feats, (3, 3), activation='relu', padding='same')(pool1)
     bn3 = BatchNormalization(axis=3)(conv2)
     conv2 = layers.Conv2D(2*feats, (3, 3), activation='relu', padding='same')(bn3)
