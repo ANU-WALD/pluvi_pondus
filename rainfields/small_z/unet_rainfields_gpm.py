@@ -102,7 +102,6 @@ def Unet():
     return model
 
 def mse_holes(y_true, y_pred):
-    #idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
     idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
     y_true = tf.gather_nd(y_true, idxs)
     y_pred = tf.gather_nd(y_pred, idxs)
@@ -110,7 +109,6 @@ def mse_holes(y_true, y_pred):
     return K.mean(K.square(y_true-y_pred), axis=-1)
 
 def msle_holes(y_true, y_pred):
-    #idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
     idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
     y_true = tf.gather_nd(y_true, idxs)
     y_pred = tf.gather_nd(y_pred, idxs)

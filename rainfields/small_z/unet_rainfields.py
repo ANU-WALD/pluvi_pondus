@@ -210,8 +210,8 @@ test_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181120.nc",
                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181130.nc"]
 """
 
-train_dataset = HimfieldsDataset(train_fnames, False, batch_size=4)
-test_dataset = HimfieldsDataset(test_fnames, False, batch_size=4)
+train_dataset = HimfieldsDataset(train_fnames, "", batch_size=4)
+test_dataset = HimfieldsDataset(test_fnames, "", batch_size=4)
 
-EPOCHS = 15
+EPOCHS = 50
 fit(train_dataset, test_dataset, EPOCHS)
