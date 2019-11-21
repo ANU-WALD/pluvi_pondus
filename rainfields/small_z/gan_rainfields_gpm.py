@@ -218,7 +218,7 @@ def fit(train_ds, test_ds, epochs):
   test_loss = tf.keras.metrics.Mean()
   template = 'Epoch {}, Loss: {:.4f}, Test Loss: {:.4f}\n'
 
-  f = open("train_record_gan_mse_rainfields.out","w+")
+  f = open("train_record_gan_mse_rainfields_gpm.out","w+")
 
   for epoch in range(epochs):
     start = time.time()
@@ -241,8 +241,8 @@ def fit(train_ds, test_ds, epochs):
     print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1, time.time()-start))
 
   f.close()
-  generator.save('gan_mse_rainfields_generator.h5')
-  discriminator.save('gan_mse_rainfields_discriminator.h5')
+  generator.save('gan_mse_rainfields_gpm_generator.h5')
+  discriminator.save('gan_mse_rainfields_gpm_discriminator.h5')
 
 
 train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
