@@ -214,7 +214,7 @@ def fit(train_ds, test_ds, epochs):
   test_loss = tf.keras.metrics.Mean()
   template = 'Epoch {}, Loss: {:.4f}, Test Loss: {:.4f}\n'
 
-  f = open("train_record_gan_mse1924_rainfields.out","w+")
+  f = open("train_record_gan_mse2530_rainfields.out","w+")
 
   for epoch in range(epochs):
     start = time.time()
@@ -237,21 +237,20 @@ def fit(train_ds, test_ds, epochs):
     print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1, time.time()-start))
 
   f.close()
-  generator.save('gan_mse1924_rainfields_generator.h5')
-  discriminator.save('gan_mse1924_rainfields_discriminator.h5')
+  generator.save('gan_mse2530_rainfields_generator.h5')
+  discriminator.save('gan_mse2530_rainfields_discriminator.h5')
 
 
-train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181119.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181120.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181121.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181122.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181123.nc",
-                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181124.nc"]
+train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181125.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181126.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181127.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181128.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181129.nc",
+                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181130.nc"]
 
-test_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181125.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181126.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181126.nc",
-               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181127.nc"]
+test_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181109.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181110.nc",
+               "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181114.nc"]
 
 
 train_dataset = HimfieldsDataset(train_fnames, "", batch_size=4)
