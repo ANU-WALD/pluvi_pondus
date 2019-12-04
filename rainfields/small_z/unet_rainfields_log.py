@@ -12,7 +12,6 @@ from data_loader_2chan_rainfields import HimfieldsDataset
 def Unet():
     concat_axis = 3
     ref_input = layers.Input(shape = (1024, 1024, 2))
-    z_input = layers.Input(shape = (256, 256, 3))
 
     feats = 16
     bn0 = layers.BatchNormalization(axis=3)(ref_input)
@@ -21,17 +20,13 @@ def Unet():
     conv1 = layers.Conv2D(feats, (3, 3), activation='relu', padding='same')(bn1)
     bn2 = layers.BatchNormalization(axis=3)(conv1)
     pool1 = layers.MaxPooling2D(pool_size=(2, 2))(bn2)
-
     conv2 = layers.Conv2D(2*feats, (3, 3), activation='relu', padding='same')(pool1)
     bn3 = layers.BatchNormalization(axis=3)(conv2)
     conv2 = layers.Conv2D(2*feats, (3, 3), activation='relu', padding='same')(bn3)
     bn4 = layers.BatchNormalization(axis=3)(conv2)
     pool2 = layers.MaxPooling2D(pool_size=(2, 2))(bn4)
     
-    zadd = layers.concatenate([z_input, pool2], axis=concat_axis)
-    zaddn = layers.BatchNormalization(axis=3)(zadd)
-
-    conv3 = layers.Conv2D(4*feats, (3, 3), activation='relu', padding='same')(zaddn)
+    conv3 = layers.Conv2D(4*feats, (3, 3), activation='relu', padding='same')(pool2)
     bn5 = layers.BatchNormalization(axis=3)(conv3)
     conv3 = layers.Conv2D(4*feats, (3, 3), activation='relu', padding='same')(bn5)
     bn6 = layers.BatchNormalization(axis=3)(conv3)
@@ -93,15 +88,14 @@ def Unet():
     conv9 = layers.Conv2D(feats, (3, 3), activation='relu', padding='same')(bn17)
     bn18 = layers.BatchNormalization(axis=3)(conv9)
 
-    conv10 = layers.Conv2D(1, (1, 1), activation='relu')(bn18)
-    #bn19 = BatchNormalization(axis=3)(conv10)
+    ref_output = layers.Conv2D(1, (1, 1), activation='relu')(bn18)
 
-    model = tf.keras.models.Model(inputs=[ref_input,z_input], outputs=conv10)
+    model = tf.keras.models.Model(inputs=ref_input, outputs=ref_output)
 
     return model
 
+
 def mse_holes(y_true, y_pred):
-    #idxs = K.tf.where(K.tf.math.logical_not(K.tf.math.is_nan(y_true)))
     idxs = tf.where(tf.math.logical_not(tf.math.is_nan(y_true)))
     y_true = tf.gather_nd(y_true, idxs)
     y_pred = tf.gather_nd(y_pred, idxs)
@@ -121,7 +115,7 @@ def msle_holes(y_true, y_pred):
 def train_step(model, inputs, outputs, optimizer):
 
   with tf.GradientTape() as t:
-    loss = mse_holes(outputs, model(inputs, training=True))
+    loss = mse_holes(K.log(outputs+1), K.log(model(inputs, training=True)+1))
 
     grads = t.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -140,19 +134,19 @@ def fit(train_ds, test_ds, epochs):
   test_loss = tf.keras.metrics.Mean()
   template = 'Epoch {}, Loss: {:.4f}, Test Loss: {:.4f}\n'
 
-  f = open("train_record_unet_mse_rainfields_znorm.out","w+")
+  f = open("train_record_unet_mse_rainfields_log.out","w+")
 
   for epoch in range(epochs):
     start = time.time()
 
     # Train
-    for batch, (ref_input, z_input, target) in enumerate(train_ds):
-      train_step(model, [ref_input, z_input], target, optimizer)
-      train_loss(calc_loss(model, [ref_input, z_input], target))
+    for batch, (ref_input, target) in enumerate(train_ds):
+      train_step(model, ref_input, target, optimizer)
+      train_loss(calc_loss(model, ref_input, target))
    
 
-    for batch, (ref_input, z_input, target) in enumerate(test_ds):
-      test_loss(calc_loss(model, [ref_input, z_input], target))
+    for batch, (ref_input, target) in enumerate(test_ds):
+      test_loss(calc_loss(model, ref_input, target))
    
 
     print(template.format(epoch+1, train_loss.result(), test_loss.result()))
@@ -165,7 +159,7 @@ def fit(train_ds, test_ds, epochs):
     print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1, time.time()-start))
 
   f.close()
-  model.save('unet_mse_rainfields_z.h5')
+  model.save('unet_mse_rainfields_log.h5')
 
 
 train_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181101.nc",
@@ -215,8 +209,8 @@ test_fnames = ["/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181120.nc",
                "/data/pluvi_pondus/HIM8_AU_2B/HIM8_2B_AU_20181130.nc"]
 """
 
-train_dataset = HimfieldsDataset(train_fnames, "z", batch_size=4)
-test_dataset = HimfieldsDataset(test_fnames, "z", batch_size=4)
+train_dataset = HimfieldsDataset(train_fnames, "", batch_size=4)
+test_dataset = HimfieldsDataset(test_fnames, "", batch_size=4)
 
 EPOCHS = 50
 fit(train_dataset, test_dataset, EPOCHS)
