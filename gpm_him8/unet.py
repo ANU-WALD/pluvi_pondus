@@ -13,45 +13,52 @@ from datetime import datetime
 from datetime import timedelta
 import pickle
 import os
-from nc_loader_small import HimfieldsDataset
-
-def get_model_memory_usage(batch_size, model):
-
-    shapes_mem_count = 0
-    for l in model.layers:
-        print(l.name)
-        print(l.output_shape)
-        single_layer_mem = 1
-        for s in l.output_shape:
-            if s is None:
-                continue
-            single_layer_mem *= s
-        shapes_mem_count += single_layer_mem
-
-    trainable_count = np.sum([K.count_params(p) for p in set(model.trainable_weights)])
-    non_trainable_count = np.sum([K.count_params(p) for p in set(model.non_trainable_weights)])
-
-    number_size = 4.0
-    if K.floatx() == 'float16':
-         number_size = 2.0
-    if K.floatx() == 'float64':
-         number_size = 8.0
-
-    total_memory = number_size*(batch_size*shapes_mem_count + trainable_count + non_trainable_count)
-    gbytes = np.round(total_memory / (1024.0 ** 3), 3)
-    return gbytes
+import math
+from nc_loader import HIM8_GPM_Dataset
 
 
-def mse_custom(y_true, y_pred):
-    N = 9
-    mk = K.constant(value=np.ones((3,3,1,1), dtype=np.float32) / N, dtype='float32')
+def conv_loss(y_true, y_pred):
+    #N = 9
+    mk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32) / 81, dtype='float32')
+    sk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32), dtype='float32')
+    
     MSconvE = K.mean(K.square(K.conv2d(y_true, mk)-K.conv2d(y_pred, mk)), axis=-1)
+    MSconvSD = K.mean(K.square(K.conv2d(K.square(y_true), sk)/81 - K.square(K.conv2d(y_true, sk)/81) - K.conv2d(K.square(y_pred), sk)/81 + K.square(K.conv2d(y_pred, sk)/81)), axis=-1)
 
-    #sk = K.constant(value=np.ones((3,3,1,1), dtype=np.float32), dtype='float32')
-    #MSconvSD = K.mean(K.square((vK.conv2d(K.square(y_true), sk) - (K.square(K.conv2d(y_true, sk))/N))/N - (vK.conv2d(K.square(y_pred), sk) - (K.square(K.conv2d(y_pred, sk))/N))/N), axis=-1)
+    return MSconvE + MSconvSD
 
 
-    return MSconvE #+ MSconvSD
+def ms_y(y_true, y_pred):
+    mk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32) / 81, dtype='float32')
+    
+    MSconvE = K.mean(K.abs(K.conv2d(y_true, mk)), axis=-1)
+
+    return MSconvE
+
+
+def ms_yhat(y_true, y_pred):
+    mk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32) / 81, dtype='float32')
+    
+    MSconvE = K.mean(K.abs(K.conv2d(y_pred, mk)), axis=-1)
+
+    return MSconvE
+
+
+def std_y(y_true, y_pred):
+    sk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32), dtype='float32')
+    
+    MSconvSD = K.mean(K.abs(K.conv2d(K.square(y_true), sk)/81 - K.square(K.conv2d(y_true, sk)/81)), axis=-1)
+
+    return MSconvSD
+
+
+def std_yhat(y_true, y_pred):
+    sk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32), dtype='float32')
+    
+    MSconvSD = K.mean(K.abs(K.conv2d(K.square(y_pred), sk)/81 - K.square(K.conv2d(y_pred, sk)/81)), axis=-1)
+
+    return MSconvSD
+
 
 def get_unet():
     concat_axis = 3
@@ -124,25 +131,38 @@ def get_unet():
 
     return model
 
-
-train_fnames = ["/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_20181101.nc",
-                "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_20181102.nc",
-                "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_20181103.nc",
-                "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_20181104.nc",
-                "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_20181105.nc",
-                "/home/lar116/project/pablo/rainfields_data/H8_2B_BoM_20181106.nc"]
-
-training_gen = HIM8_GPM_Dataset(train_fnames, 1, batch_size=8)
-validation_gen = HIM8_GPM_Dataset(test_fnames, 1, batch_size=8)
+train_gen = HIM8_GPM_Dataset("201811", batch_size=32)
+test_gen = HIM8_GPM_Dataset("201812", batch_size=32)
 
 model = get_unet()
 print(model.summary())
-sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-model.compile(loss=mse_custom, optimizer=sgd)
+sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
+model.compile(loss=conv_loss, metrics=['mse',ms_y,ms_yhat,std_y,std_yhat], optimizer=sgd)
 
-history = model.fit_generator(generator=training_gen, validation_data=validation_gen, epochs=100, verbose=1)
+print(tf.config.experimental.list_physical_devices('GPU'))
+history = model.fit(train_gen, epochs=200, validation_data=test_gen)
+#history = model.fit(test_gen, epochs=200)
 
-with open('train_history_him8_8batch.pkl', 'wb') as f:
+with open('train_history_mse.pkl', 'wb') as f:
     pickle.dump(history.history, f)
 
-parallel_model.save('rainfields_model_mse_small.h5')
+model.save('gpm_model_mse.h5')
+
+"""
+for w_mean in [.5, 1, 2, 4]:
+    for w_std in [.5, 1, 2, 4]:
+
+        train_gen = HIM8_GPM_Dataset(batch_size=32)
+
+        model = get_unet()
+        print(model.summary())
+        sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
+        model.compile(loss='mse', optimizer=sgd)
+
+        history = model.fit_generator(generator=train_gen, epochs=50)
+
+        with open('train_history_{}_{}.pkl'.format(w_mean, w_std), 'wb') as f:
+            pickle.dump(history.history, f)
+
+        model.save('gpm_model_{}_{}.h5'.format(w_mean, w_std))
+"""
