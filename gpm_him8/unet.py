@@ -1,3 +1,7 @@
+import logging, os
+
+logging.disable(logging.WARNING)
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import tensorflow as tf
 
@@ -18,53 +22,56 @@ from nc_loader import HIM8_GPM_Dataset
 
 
 def conv_loss(y_true, y_pred):
-    #N = 9
-    mk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32) / 81, dtype='float32')
-    sk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32), dtype='float32')
+    n = 5
+    mk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32) / n**2, dtype='float32')
+    sk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32), dtype='float32')
     
-    MSconvE = K.mean(K.square(K.conv2d(y_true, mk)-K.conv2d(y_pred, mk)), axis=-1)
-    MSconvSD = K.mean(K.square(K.conv2d(K.square(y_true), sk)/81 - K.square(K.conv2d(y_true, sk)/81) - K.conv2d(K.square(y_pred), sk)/81 + K.square(K.conv2d(y_pred, sk)/81)), axis=-1)
-
-    return MSconvE + MSconvSD
-
-
-def ms_y(y_true, y_pred):
-    mk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32) / 81, dtype='float32')
+    Bias = K.mean(K.abs(K.conv2d(y_true, mk)-K.conv2d(y_pred, mk)), axis=-1)
+    Var = K.mean(K.abs((K.conv2d(K.square(y_true), sk) - K.square(K.conv2d(y_true, sk)/n**2))/n**2 - (K.conv2d(K.square(y_pred), sk) - K.square(K.conv2d(y_pred, sk)/n**2))/n**2), axis=-1)
     
-    MSconvE = K.mean(K.abs(K.conv2d(y_true, mk)), axis=-1)
-
-    return MSconvE
+    return Var + 4*Bias
 
 
-def ms_yhat(y_true, y_pred):
-    mk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32) / 81, dtype='float32')
+def mean_y(y_true, y_pred):
+    n = 5
+    mk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32) / n**2, dtype='float32')
     
-    MSconvE = K.mean(K.abs(K.conv2d(y_pred, mk)), axis=-1)
+    Mean = K.mean(K.conv2d(y_true, mk), axis=-1)
 
-    return MSconvE
+    return Mean
 
 
-def std_y(y_true, y_pred):
-    sk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32), dtype='float32')
+def mean_yhat(y_true, y_pred):
+    n = 5
+    mk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32) / n**2, dtype='float32')
     
-    MSconvSD = K.mean(K.abs(K.conv2d(K.square(y_true), sk)/81 - K.square(K.conv2d(y_true, sk)/81)), axis=-1)
+    Mean = K.mean(K.conv2d(y_pred, mk), axis=-1)
 
-    return MSconvSD
+    return Mean
 
 
-def std_yhat(y_true, y_pred):
-    sk = K.constant(value=np.ones((9,9,1,1), dtype=np.float32), dtype='float32')
+def var_y(y_true, y_pred):
+    n = 5
+    sk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32), dtype='float32')
     
-    MSconvSD = K.mean(K.abs(K.conv2d(K.square(y_pred), sk)/81 - K.square(K.conv2d(y_pred, sk)/81)), axis=-1)
+    Var = K.mean((K.conv2d(K.square(y_true), sk) - K.square(K.conv2d(y_true, sk)/n**2))/n**2, axis=-1)
 
-    return MSconvSD
+    return Var
+
+def var_yhat(y_true, y_pred):
+    n = 5
+    sk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32), dtype='float32')
+    
+    Var = K.mean((K.conv2d(K.square(y_pred), sk) - K.square(K.conv2d(y_pred, sk)/n**2))/n**2, axis=-1)
+
+    return Var
 
 
 def get_unet():
     concat_axis = 3
     inputs = layers.Input(shape = (512, 512, 2))
 
-    feats = 16
+    feats = 4#16
     bn0 = BatchNormalization(axis=3)(inputs)
     conv1 = layers.Conv2D(feats, (3, 3), activation='relu', padding='same', name='conv1_1')(bn0)
     bn1 = BatchNormalization(axis=3)(conv1)
@@ -124,7 +131,8 @@ def get_unet():
     conv7 = layers.Conv2D(4*feats, (3, 3), activation='relu', padding='same')(bn13)
     bn14 = BatchNormalization(axis=3)(conv7)
 
-    conv8 = layers.Conv2D(1, (1, 1))(bn14)
+    # Rectify last convolution layer to constraint output to positive precipitation values.
+    conv8 = layers.Conv2D(1, (1, 1), activation='relu')(bn14)
 
     model = models.Model(inputs=inputs, outputs=conv8)
 
@@ -137,16 +145,15 @@ test_gen = HIM8_GPM_Dataset("201812", batch_size=32)
 model = get_unet()
 print(model.summary())
 sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
-model.compile(loss=conv_loss, metrics=['mse',ms_y,ms_yhat,std_y,std_yhat], optimizer=sgd)
+model.compile(loss=conv_loss, metrics=['mse',mean_y,mean_yhat,var_y,var_yhat], optimizer=sgd)
 
 print(tf.config.experimental.list_physical_devices('GPU'))
-history = model.fit(train_gen, epochs=200, validation_data=test_gen)
-#history = model.fit(test_gen, epochs=200)
+history = model.fit(train_gen, epochs=100, validation_data=test_gen)
 
-with open('train_history_mse.pkl', 'wb') as f:
+with open('train_history_convtweak.pkl', 'wb') as f:
     pickle.dump(history.history, f)
 
-model.save('gpm_model_mse.h5')
+model.save('gpm_model_5convwb100epochs.h5')
 
 """
 for w_mean in [.5, 1, 2, 4]:
