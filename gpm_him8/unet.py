@@ -18,22 +18,25 @@ from datetime import timedelta
 import pickle
 import os
 import math
-from nc_loader import HIM8_GPM_Dataset
+from nc_loader import HIM8_GPM_Dataset, HIM8_GPM_Dataset_test
 
 
-def conv_loss(y_true, y_pred):
-    n = 5
-    mk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32) / n**2, dtype='float32')
-    sk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32), dtype='float32')
+
+def conv_loss_gen(alpha, beta, n):
+    def conv_loss(y_true, y_pred):
+        mk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32) / n**2, dtype='float32')
+        sk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32), dtype='float32')
     
-    Bias = K.mean(K.abs(K.conv2d(y_true, mk)-K.conv2d(y_pred, mk)), axis=-1)
-    Var = K.mean(K.abs((K.conv2d(K.square(y_true), sk) - K.square(K.conv2d(y_true, sk)/n**2))/n**2 - (K.conv2d(K.square(y_pred), sk) - K.square(K.conv2d(y_pred, sk)/n**2))/n**2), axis=-1)
+        Bias = K.mean(K.abs(K.conv2d(y_true, mk) - K.conv2d(y_pred, mk)), axis=-1)
+        Var = K.mean(K.abs((K.conv2d(K.square(y_true), sk) - K.square(K.conv2d(y_true, sk)/n**2))/n**2 - (K.conv2d(K.square(y_pred), sk) - K.square(K.conv2d(y_pred, sk)/n**2))/n**2), axis=-1)
     
-    return Var + 4*Bias
+        return alpha*Var + beta*Bias
+
+    return conv_loss
 
 
 def mean_y(y_true, y_pred):
-    n = 5
+    n = 9
     mk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32) / n**2, dtype='float32')
     
     Mean = K.mean(K.conv2d(y_true, mk), axis=-1)
@@ -42,7 +45,7 @@ def mean_y(y_true, y_pred):
 
 
 def mean_yhat(y_true, y_pred):
-    n = 5
+    n = 9
     mk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32) / n**2, dtype='float32')
     
     Mean = K.mean(K.conv2d(y_pred, mk), axis=-1)
@@ -51,7 +54,7 @@ def mean_yhat(y_true, y_pred):
 
 
 def var_y(y_true, y_pred):
-    n = 5
+    n = 9
     sk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32), dtype='float32')
     
     Var = K.mean((K.conv2d(K.square(y_true), sk) - K.square(K.conv2d(y_true, sk)/n**2))/n**2, axis=-1)
@@ -59,7 +62,7 @@ def var_y(y_true, y_pred):
     return Var
 
 def var_yhat(y_true, y_pred):
-    n = 5
+    n = 9
     sk = K.constant(value=np.ones((n,n,1,1), dtype=np.float32), dtype='float32')
     
     Var = K.mean((K.conv2d(K.square(y_pred), sk) - K.square(K.conv2d(y_pred, sk)/n**2))/n**2, axis=-1)
@@ -139,37 +142,27 @@ def get_unet():
 
     return model
 
-train_gen = HIM8_GPM_Dataset("201811", batch_size=32)
-test_gen = HIM8_GPM_Dataset("201812", batch_size=32)
 
-model = get_unet()
-print(model.summary())
-sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
-model.compile(loss=conv_loss, metrics=['mse',mean_y,mean_yhat,var_y,var_yhat], optimizer=sgd)
+losses = {'mse':'mse'}
 
-print(tf.config.experimental.list_physical_devices('GPU'))
-history = model.fit(train_gen, epochs=100, validation_data=test_gen)
+for beta in [1.,2.,4.]:
+    for alpha in [1.,2.,4.]:
+        for conv_size in [3,5,7,9]:
+            losses["conv{}_alpha{}_beta{}".format(conv_size,int(alpha),int(beta))] = conv_loss_gen(alpha,beta,conv_size)
 
-with open('train_history_convtweak.pkl', 'wb') as f:
-    pickle.dump(history.history, f)
+for name,loss in losses.items():
+    train_gen = HIM8_GPM_Dataset(["201811"], batch_size=32)
+    test_gen = HIM8_GPM_Dataset_test(["201904"], batch_size=32)
 
-model.save('gpm_model_5convwb100epochs.h5')
+    model = get_unet()
+    print(model.summary())
+    sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
+    model.compile(loss=loss, metrics=['mse',mean_y,mean_yhat,var_y,var_yhat], optimizer=sgd)
 
-"""
-for w_mean in [.5, 1, 2, 4]:
-    for w_std in [.5, 1, 2, 4]:
+    print(tf.config.experimental.list_physical_devices('GPU'))
+    history = model.fit(train_gen, epochs=200, validation_data=test_gen)
 
-        train_gen = HIM8_GPM_Dataset(batch_size=32)
+    with open('history_2months_200epochs_4chan_{}.pkl'.format(name), 'wb') as f:
+        pickle.dump(history.history, f)
 
-        model = get_unet()
-        print(model.summary())
-        sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
-        model.compile(loss='mse', optimizer=sgd)
-
-        history = model.fit_generator(generator=train_gen, epochs=50)
-
-        with open('train_history_{}_{}.pkl'.format(w_mean, w_std), 'wb') as f:
-            pickle.dump(history.history, f)
-
-        model.save('gpm_model_{}_{}.h5'.format(w_mean, w_std))
-"""
+    model.save('model_2months_200epochs_4chan_{}.h5'.format(name))
