@@ -82,10 +82,10 @@ color_list = np.array([(255, 255, 255),  # 0.0
 color_list = color_list/255.
 cm = LinearSegmentedColormap.from_list("BOM-RF3", color_list, N=32)
 
-conv_model1 = load_model('model_2months_150epochs_conv5_alpha1_beta1.h5', custom_objects={'conv_loss': conv_loss,'mean_y':mean_y,'mean_yhat':mean_yhat,'var_y':var_y,'var_yhat':var_yhat})
-conv_model2 = load_model('model_2months_150epochs_conv5_alpha2_beta2.h5', custom_objects={'conv_loss': conv_loss,'mean_y':mean_y,'mean_yhat':mean_yhat,'var_y':var_y,'var_yhat':var_yhat})
-conv_model4 = load_model('model_2months_150epochs_conv5_alpha2_beta4.h5', custom_objects={'conv_loss': conv_loss,'mean_y':mean_y,'mean_yhat':mean_yhat,'var_y':var_y,'var_yhat':var_yhat})
-mse_model = load_model('model_2months_150epochs_mse.h5', custom_objects={'conv_loss': conv_loss,'mean_y':mean_y,'mean_yhat':mean_yhat,'var_y':var_y,'var_yhat':var_yhat})
+conv_model1 = load_model('model_2months_200epochs_4chan_conv3_alpha1_beta2.h5', custom_objects={'conv_loss': conv_loss,'mean_y':mean_y,'mean_yhat':mean_yhat,'var_y':var_y,'var_yhat':var_yhat})
+conv_model2 = load_model('model_2months_200epochs_4chan_conv5_alpha1_beta2.h5', custom_objects={'conv_loss': conv_loss,'mean_y':mean_y,'mean_yhat':mean_yhat,'var_y':var_y,'var_yhat':var_yhat})
+conv_model4 = load_model('model_2months_200epochs_4chan_conv7_alpha1_beta2.h5', custom_objects={'conv_loss': conv_loss,'mean_y':mean_y,'mean_yhat':mean_yhat,'var_y':var_y,'var_yhat':var_yhat})
+mse_model = load_model('model_2months_200epochs_4chan_mse.h5', custom_objects={'conv_loss': conv_loss,'mean_y':mean_y,'mean_yhat':mean_yhat,'var_y':var_y,'var_yhat':var_yhat})
 
 dsg = xr.open_dataset("/data/GPM_HIM8/GPM_201903.nc")
 dsh = xr.open_dataset("/data/GPM_HIM8/HIM8_201903.nc")
