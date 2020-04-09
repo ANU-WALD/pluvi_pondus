@@ -130,6 +130,8 @@ def get_unet():
 
 
 losses = {'mse':'mse'}
+
+"""
 losses = {}
 
 #for conv_size in [7,9]:
@@ -137,18 +139,19 @@ for conv_size in [9]:
     for alpha in [4.]:
         for beta in [1.]:
             losses["conv{}_alpha{}_beta{}".format(conv_size,int(alpha),int(beta))] = conv_loss_gen(alpha,beta,conv_size)
+"""
 
 
 for name, loss in losses.items():
     model = get_unet()
     print(model.summary())
-    opt = Adagrad(lr=0.001, decay=1e-6)
+    opt = Adagrad(lr=0.0001)#, decay=1e-6)
     model.compile(loss=loss, metrics=['mse',mean_y,mean_yhat,var_y,var_yhat], optimizer=opt)
 
     print(tf.config.experimental.list_physical_devices('GPU'))
-    history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=100)
+    history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=200)
 
-    with open('history_3months_100epochs_4chan_{}.pkl'.format(name), 'wb') as f:
+    with open('history_3months_200epochs_4chan_{}.pkl'.format(name), 'wb') as f:
         pickle.dump(history.history, f)
 
-    model.save('model_3months_100epochs_4chan_{}.h5'.format(name))
+    model.save('model_3months_200epochs_4chan_{}.h5'.format(name))
